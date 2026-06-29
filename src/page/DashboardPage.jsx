@@ -13,7 +13,7 @@ import {
 } from 'recharts'
 import { useAppContext } from '../context/AppContext'
 import { getGlobalReport, getCostSavingTrend } from '../client'
-import { formatPeriodLabel, INITIATIVE_TYPES, labelFor } from '../constants'
+import { formatPeriodLabel, INITIATIVE_TYPES, labelFor } from '../../constants'
 import { Spinner, ErrorBanner, EmptyState } from '../components/Feedback'
 import StatCard from '../components/StatCard'
 
