@@ -12,6 +12,7 @@ body {
   padding: 16px;
 }
 
+/* ---- Navigation ---- */
 .nav {
   display: flex;
   gap: 8px;
@@ -33,6 +34,7 @@ body {
   border-color: #2563eb;
 }
 
+/* ---- Cards ---- */
 .card {
   background: #fff;
   border-radius: 10px;
@@ -40,9 +42,38 @@ body {
   margin-bottom: 16px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
-
 .card h2, .card h3 { margin-top: 0; }
 
+/* ---- Stat cards grid ---- */
+/* ADDED: .grid-stats used in DashboardPage, was missing */
+.grid-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+@media (max-width: 700px) {
+  .grid-stats { grid-template-columns: 1fr; }
+}
+
+/* ADDED: .stat-card / .stat-value / .stat-label used in StatCard component */
+.stat-card {
+  text-align: center;
+}
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #2563eb;
+  margin-bottom: 4px;
+}
+.stat-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 2px;
+}
+
+/* ---- Row / layout helpers ---- */
 .row {
   display: flex;
   gap: 12px;
@@ -51,6 +82,17 @@ body {
   margin-bottom: 12px;
 }
 
+/* ADDED: .picker-label used in DashboardPage and SiteAndPeriodPicker */
+.picker-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #444;
+}
+
+/* ---- Form controls ---- */
 select, input[type=text], input[type=number], input[type=file] {
   padding: 8px;
   border: 1px solid #ccc;
@@ -58,6 +100,7 @@ select, input[type=text], input[type=number], input[type=file] {
   font-size: 14px;
 }
 
+/* ---- Table ---- */
 table {
   width: 100%;
   border-collapse: collapse;
@@ -70,6 +113,7 @@ th, td {
 }
 th { background: #f0f1f3; }
 
+/* ---- Buttons ---- */
 button {
   padding: 8px 14px;
   border-radius: 6px;
@@ -92,17 +136,29 @@ button:disabled {
   cursor: not-allowed;
 }
 
+/* ---- Status badges ---- */
 .status-badge {
   padding: 2px 8px;
   border-radius: 12px;
   font-size: 12px;
   font-weight: 600;
 }
-.status-Completed { background: #d1fae5; color: #065f46; }
-.status-InProgress { background: #fef3c7; color: #92400e; }
-.status-Delayed { background: #fee2e2; color: #991b1b; }
-.status-NotStarted { background: #e5e7eb; color: #374151; }
+.status-Completed   { background: #d1fae5; color: #065f46; }
+.status-InProgress  { background: #fef3c7; color: #92400e; }
+.status-Delayed     { background: #fee2e2; color: #991b1b; }
+.status-NotStarted  { background: #e5e7eb; color: #374151; }
+/* Training statuses */
+.status-Planned     { background: #dbeafe; color: #1e40af; }
+.status-Postponed   { background: #f3e8ff; color: #6b21a8; }
+/* Project statuses */
+.status-Proposed    { background: #dbeafe; color: #1e40af; }
+.status-OnHold      { background: #f3f4f6; color: #374151; }
+/* Period statuses */
+.status-Open        { background: #d1fae5; color: #065f46; }
+.status-Submitted   { background: #fef3c7; color: #92400e; }
+.status-Locked      { background: #fee2e2; color: #991b1b; }
 
+/* ---- Grids ---- */
 .grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -112,8 +168,11 @@ button:disabled {
   .grid-2 { grid-template-columns: 1fr; }
 }
 
+/* ---- Feedback / utility ---- */
 .muted { color: #666; font-size: 13px; }
 .error-text { color: #dc2626; font-size: 13px; }
+
+/* ADDED: .warning-box was in CSS but missing the margin-top in some contexts */
 .warning-box {
   background: #fff7ed;
   border: 1px solid #fdba74;
@@ -121,4 +180,43 @@ button:disabled {
   padding: 10px;
   font-size: 13px;
   margin-top: 10px;
+}
+
+/* ADDED: .error-banner used by ErrorBanner component, was missing */
+.error-banner {
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #991b1b;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+/* ADDED: .empty-state used by EmptyState component, was missing */
+.empty-state {
+  padding: 24px;
+  text-align: center;
+  color: #999;
+}
+
+/* ADDED: .spinner-row and .spinner used by Spinner component, were missing */
+.spinner-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 0;
+}
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #ddd;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
