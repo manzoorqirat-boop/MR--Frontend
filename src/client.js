@@ -71,4 +71,11 @@ export const getCostSavingTrend = (lastNMonths = 6) =>
 export const getGlobalReport = (reportPeriodId) =>
   api.get('/api/analytics/global-report', { params: { reportPeriodId } }).then(r => r.data)
 
+// Range analytics: aggregates across a span of periods, monthly or quarterly,
+// optionally filtered to one site. Pass siteId = undefined for "all sites".
+export const getRangeAnalytics = ({ fromYear, fromMonth, toYear, toMonth, granularity = 'monthly', siteId }) =>
+  api.get('/api/analytics/range', {
+    params: { fromYear, fromMonth, toYear, toMonth, granularity, siteId: siteId ?? undefined }
+  }).then(r => r.data)
+
 export default api
