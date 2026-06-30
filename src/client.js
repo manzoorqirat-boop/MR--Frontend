@@ -78,4 +78,45 @@ export const getRangeAnalytics = ({ fromYear, fromMonth, toYear, toMonth, granul
     params: { fromYear, fromMonth, toYear, toMonth, granularity, siteId: siteId ?? undefined }
   }).then(r => r.data)
 
+// ============================================================
+//  Monthly Site Scorecard (20-sheet QC/QA metrics module)
+// ============================================================
+
+// ---- Schema (definitions for all 20 metric sheets) ----
+export const getScorecardSchema = () =>
+  api.get('/api/scorecard/schema').then(r => r.data)
+
+// ---- Data entry ----
+export const getScorecardRows = (siteId, reportPeriodId, metricKey) =>
+  api.get('/api/scorecard/rows', { params: { siteId, reportPeriodId, metricKey } }).then(r => r.data)
+
+// payload: { siteId, reportPeriodId, metricKey, rows: [{ rowIndex, cells: { colKey: value } }] }
+// Replace semantics: the posted rows fully define that metric for the site/period.
+export const saveScorecardRows = (payload) =>
+  api.post('/api/scorecard/rows', payload).then(r => r.data)
+
+// Row counts per metric for a site/period (drives the "filled sheets" checklist).
+export const getScorecardStatus = (siteId, reportPeriodId) =>
+  api.get('/api/scorecard/status', { params: { siteId, reportPeriodId } }).then(r => r.data)
+
+// ---- Template download (blank .xlsx, one tab per metric) ----
+export const downloadScorecardTemplate = () =>
+  api.get('/api/scorecard/template', { responseType: 'blob' }).then(r => r.data)
+
+// ---- Excel import ----
+export const importScorecard = (siteId, reportPeriodId, file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return api.post('/api/scorecard/import', formData, {
+    params: { siteId, reportPeriodId },
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }).then(r => r.data)
+}
+
+// ---- Analytics ----
+// body: { metricKey, columnKey?, fromYear, fromMonth, toYear, toMonth, siteIds?, granularity }
+// Returns flat points: [{ siteId, siteName, reportPeriodId, periodLabel, year, month, metricKey, columnKey, value }]
+export const getScorecardAnalytics = (query) =>
+  api.post('/api/scorecard/analytics', query).then(r => r.data)
+
 export default api
