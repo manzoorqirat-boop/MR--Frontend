@@ -2,6 +2,7 @@ import React from 'react'
 import { BrowserRouter, NavLink, Route, Routes, Navigate } from 'react-router-dom'
 import { AppProvider } from './context/AppContext'
 import DashboardPage from './page/DashboardPage'
+import AnalyticsPage from './page/AnalyticsPage'
 import TrainingPage from './page/TrainingPage'
 import InitiativesPage from './page/InitiativesPage'
 import CostSavingsPage from './page/CostSavingsPage'
@@ -10,6 +11,7 @@ import ExcelImportPage from './page/ExcellImportPage'
 
 const NAV_LINKS = [
   { to: '/dashboard', label: 'Dashboard' },
+  { to: '/analytics', label: 'Analytics' },
   { to: '/training', label: 'Training' },
   { to: '/initiatives', label: 'Initiatives' },
   { to: '/cost-savings', label: 'Cost Savings' },
@@ -37,6 +39,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/training" element={<TrainingPage />} />
             <Route path="/initiatives" element={<InitiativesPage />} />
             <Route path="/cost-savings" element={<CostSavingsPage />} />
