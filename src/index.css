@@ -220,3 +220,93 @@ button:disabled {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* ============================================================
+   Monthly Site Scorecard module
+   ============================================================ */
+
+.scorecard-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .scorecard-layout { grid-template-columns: 1fr; }
+}
+
+.scorecard-nav { padding: 12px; max-height: 80vh; overflow-y: auto; }
+.scorecard-nav-group { margin-bottom: 14px; }
+.scorecard-nav-cat {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+  font-weight: 700;
+  margin: 4px 6px 6px;
+}
+.scorecard-nav-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: #374151;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.scorecard-nav-item:hover { background: #f1f5f9; }
+.scorecard-nav-item.active { background: #2563eb; color: #fff; }
+.scorecard-badge {
+  background: #16a34a;
+  color: #fff;
+  border-radius: 10px;
+  font-size: 11px;
+  padding: 1px 7px;
+  font-weight: 600;
+}
+.scorecard-nav-item.active .scorecard-badge { background: rgba(255,255,255,0.3); }
+
+.scorecard-main { padding: 16px; }
+.scorecard-main-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+
+.scorecard-table-wrap { overflow-x: auto; }
+.scorecard-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.scorecard-table th, .scorecard-table td {
+  border: 1px solid #e5e7eb;
+  padding: 5px 8px;
+  text-align: left;
+  vertical-align: middle;
+}
+.scorecard-table th { background: #f8fafc; font-weight: 600; white-space: nowrap; }
+.scorecard-table th.computed-col { background: #f1f5f9; color: #6b7280; }
+.scorecard-table input { border: 1px solid #d1d5db; border-radius: 5px; padding: 4px 6px; font-size: 13px; }
+.computed-cell { background: #f8fafc; color: #2563eb; font-variant-numeric: tabular-nums; text-align: right; }
+.calc-tag {
+  font-size: 9px;
+  background: #e2e8f0;
+  color: #64748b;
+  padding: 1px 5px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* analytics controls */
+.scorecard-analytics-controls { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 12px; }
+.scorecard-site-filter { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.chip {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.chip:hover { background: #e2e8f0; }
+.chip-active { background: #2563eb; color: #fff; border-color: #2563eb; }
