@@ -1,271 +1,987 @@
-namespace SiteReportApp.Services
-{
-    // ---- Scorecard schema: the single source of truth for the 20 metric sheets ----
-    //
-    // Generated from the standard "Monthly Site Scorecard" template. Each metric maps
-    // to one sheet; each column is either an input (Number/Text/Date) or a Computed
-    // column whose Formula references other columns by {key}. The frontend ships an
-    // identical definition (scorecardSchema.js) so forms, template and analytics stay
-    // in lockstep. Keep the two in sync when adding metrics.
-    public enum ScColType { Number, Text, Date, Computed }
+// Mirror of the backend ScorecardSchema (Services/ScorecardSchema.cs), generated from
+// the standard Monthly Site Scorecard template. Drives the dynamic data-entry forms,
+// the analytics column pickers and the on-screen computed-column preview.
+// Keep in sync with the backend when adding metrics.
 
-    public class ScColumn
-    {
-        public string Key { get; set; } = "";
-        public string Label { get; set; } = "";
-        public ScColType Type { get; set; }
-        public string? Formula { get; set; }   // only for Computed; refs other cols as {key}
+export const SCORECARD_SCHEMA = [
+  {
+    "key": "humanError",
+    "title": "Human Error",
+    "category": "Quality & Compliance",
+    "multiRow": true,
+    "order": 1,
+    "columns": [
+      {
+        "key": "relatedEvents",
+        "label": "Related Events",
+        "excelCol": 3,
+        "type": "text",
+        "formula": null
+      },
+      {
+        "key": "noOfEventClosedInTimePeriod",
+        "label": "No of Event Closed in Time period",
+        "excelCol": 4,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "rootCauseAsHumanErrror",
+        "label": "Root cause as Human Errror",
+        "excelCol": 5,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "ofHumanError",
+        "label": "% of Human Error",
+        "excelCol": 6,
+        "type": "computed",
+        "formula": "={rootCauseAsHumanErrror}/{noOfEventClosedInTimePeriod}"
+      }
+    ],
+    "sheetName": "Human Error"
+  },
+  {
+    "key": "oosRate",
+    "title": "OOS Rate (%)",
+    "category": "Quality & Compliance",
+    "multiRow": false,
+    "order": 2,
+    "columns": [
+      {
+        "key": "noOfBatchSampleAnalyzedInQcArNo",
+        "label": "No of Batch sample analyzed in QC (AR No.)",
+        "excelCol": 3,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "noOfInvalidOosClosedInTimePeriod",
+        "label": "No of Invalid OOS Closed in Time period",
+        "excelCol": 4,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "noOfValidOosClosedInTimePeriod",
+        "label": "No of valid OOS Closed in Time period",
+        "excelCol": 5,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "totalOosClosed",
+        "label": "Total OOS Closed",
+        "excelCol": 6,
+        "type": "computed",
+        "formula": "=SUM({noOfInvalidOosClosedInTimePeriod}:{noOfValidOosClosedInTimePeriod})"
+      },
+      {
+        "key": "invalidOos",
+        "label": "% Invalid OOS",
+        "excelCol": 7,
+        "type": "computed",
+        "formula": "={noOfInvalidOosClosedInTimePeriod}/{noOfBatchSampleAnalyzedInQcArNo}"
+      },
+      {
+        "key": "validOos",
+        "label": "% valid OOS",
+        "excelCol": 8,
+        "type": "computed",
+        "formula": "={noOfValidOosClosedInTimePeriod}/{noOfBatchSampleAnalyzedInQcArNo}"
+      },
+      {
+        "key": "overallOos",
+        "label": "%overall OOS",
+        "excelCol": 9,
+        "type": "computed",
+        "formula": "={totalOosClosed}/{noOfBatchSampleAnalyzedInQcArNo}"
+      }
+    ],
+    "sheetName": "OOS Rate (%)"
+  },
+  {
+    "key": "deviationRate",
+    "title": "Deviation Rate",
+    "category": "Quality & Compliance",
+    "multiRow": false,
+    "order": 3,
+    "columns": [
+      {
+        "key": "noOfBatchesMgfPkg",
+        "label": "No of Batches (Mgf & Pkg)",
+        "excelCol": 3,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "totalDeviationReportedInTimePeriod",
+        "label": "Total Deviation reported in time period",
+        "excelCol": 4,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "deviation",
+        "label": "% Deviation",
+        "excelCol": 5,
+        "type": "computed",
+        "formula": "=SUM({totalDeviationReportedInTimePeriod}/{noOfBatchesMgfPkg})"
+      }
+    ],
+    "sheetName": "Deviation Rate"
+  },
+  {
+    "key": "lir",
+    "title": "LIR",
+    "category": "Quality & Compliance",
+    "multiRow": false,
+    "order": 4,
+    "columns": [
+      {
+        "key": "noOfBatchSampleAnalyzedInQcArNo",
+        "label": "No of Batch sample analyzed in QC (AR No.)",
+        "excelCol": 3,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "noOfLirReportedAfterSamples",
+        "label": "No of LIR reported After Samples",
+        "excelCol": 4,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "noOfLirReportedBeforeSamples",
+        "label": "No of LIR reported Before samples",
+        "excelCol": 5,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "totalNoOfLirReportedInTimePeriod",
+        "label": "Total No of LIR reported in time period",
+        "excelCol": 6,
+        "type": "computed",
+        "formula": "={noOfLirReportedAfterSamples}+{noOfLirReportedBeforeSamples}"
+      },
+      {
+        "key": "lir",
+        "label": "% LIR",
+        "excelCol": 7,
+        "type": "computed",
+        "formula": "=SUM({totalNoOfLirReportedInTimePeriod}/{noOfBatchSampleAnalyzedInQcArNo})"
+      }
+    ],
+    "sheetName": "LIR"
+  },
+  {
+    "key": "repetitiveEvents",
+    "title": "Repetitive Events (%)",
+    "category": "Quality & Compliance",
+    "multiRow": true,
+    "order": 5,
+    "columns": [
+      {
+        "key": "events",
+        "label": "Events",
+        "excelCol": 3,
+        "type": "text",
+        "formula": null
+      },
+      {
+        "key": "totalNoOfEventClosed",
+        "label": "Total no of Event Closed",
+        "excelCol": 4,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "noOfRepetativeEventBasedOnProductForRepe",
+        "label": "No of Repetative Event based on product (for repetative nature- follow SOP time period)",
+        "excelCol": 5,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "repetitiveBasedOnProduct",
+        "label": "% Repetitive Based on Product",
+        "excelCol": 6,
+        "type": "computed",
+        "formula": "={noOfRepetativeEventBasedOnProductForRepe}/{totalNoOfEventClosed}"
+      },
+      {
+        "key": "noOfRepetativeEventBasedOnSimilarRootCau",
+        "label": "No of Repetative Event based on similar Root cause (RCA) in time period (for repetative nature- follow SOP time period)",
+        "excelCol": 7,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "repetitiveBasedOnRca",
+        "label": "% Repetitive based on RCA",
+        "excelCol": 8,
+        "type": "computed",
+        "formula": "={noOfRepetativeEventBasedOnSimilarRootCau}/{totalNoOfEventClosed}"
+      }
+    ],
+    "sheetName": "Repetitive Events (%)"
+  },
+  {
+    "key": "hplcOccupancy",
+    "title": "HPLC Occupancy (%)",
+    "category": "Laboratory Performance",
+    "multiRow": false,
+    "order": 6,
+    "columns": [
+      {
+        "key": "totalNoOfHplcA",
+        "label": "Total no of HPLC (A)",
+        "excelCol": 3,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "actualHplcRunHour",
+        "label": "Actual HPLC Run (Hour)",
+        "excelCol": 4,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "noOfWorkingDaysAtSiteByConsideringSiteWo",
+        "label": "No of working Days at site (By considering site working for 30 days)",
+        "excelCol": 5,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "standardHrsDay",
+        "label": "Standard hrs @ day",
+        "excelCol": 6,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "totalStandardTimeInHour3024A",
+        "label": "Total standard Time in (Hour) (30*24*A)",
+        "excelCol": 7,
+        "type": "computed",
+        "formula": "={standardHrsDay}*{noOfWorkingDaysAtSiteByConsideringSiteWo}*{totalNoOfHplcA}"
+      },
+      {
+        "key": "hplcOccupancy",
+        "label": "%HPLC Occupancy",
+        "excelCol": 8,
+        "type": "computed",
+        "formula": "={actualHplcRunHour}/{totalStandardTimeInHour3024A}"
+      }
+    ],
+    "sheetName": "HPLC Occupancy (%)"
+  },
+  {
+    "key": "gcOccupancy",
+    "title": "GC Occupancy (%)",
+    "category": "Laboratory Performance",
+    "multiRow": false,
+    "order": 7,
+    "columns": [
+      {
+        "key": "totalNoOfGcA",
+        "label": "Total no of GC (A)",
+        "excelCol": 3,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "actualGcRunHour",
+        "label": "Actual GC Run (Hour)",
+        "excelCol": 4,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "noOfWorkingDaysAtSiteByConsideringSiteWo",
+        "label": "No of working Days at site (By considering site working for 30 days)",
+        "excelCol": 5,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "standardHrsDay",
+        "label": "Standard hrs @ day",
+        "excelCol": 6,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "totalStandardTimeInHour3024A",
+        "label": "Total standard Time in (Hour) (30*24*A)",
+        "excelCol": 7,
+        "type": "computed",
+        "formula": "={standardHrsDay}*{noOfWorkingDaysAtSiteByConsideringSiteWo}*{totalNoOfGcA}"
+      },
+      {
+        "key": "gcOccupancy",
+        "label": "%GC Occupancy",
+        "excelCol": 8,
+        "type": "computed",
+        "formula": "={actualGcRunHour}/{totalStandardTimeInHour3024A}"
+      }
+    ],
+    "sheetName": "GC Occupancy (%)"
+  },
+  {
+    "key": "analystEfficiency",
+    "title": "Analyst Efficiency",
+    "category": "Laboratory Performance",
+    "multiRow": false,
+    "order": 8,
+    "columns": [
+      {
+        "key": "totalNoOfSampleReceivedForTesting",
+        "label": "Total no of sample received for testing",
+        "excelCol": 3,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "totalNoOfSampleAnalysed",
+        "label": "Total no of sample analysed",
+        "excelCol": 4,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "totalNoOfAnalystInLab",
+        "label": "Total no of analyst in LAB",
+        "excelCol": 5,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "totalNoOfWorkingDays",
+        "label": "Total no of working days",
+        "excelCol": 6,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "analystEfficiency",
+        "label": "% Analyst Efficiency",
+        "excelCol": 7,
+        "type": "computed",
+        "formula": "={totalNoOfSampleAnalysed}/({totalNoOfAnalystInLab}*{totalNoOfWorkingDays})"
+      }
+    ],
+    "sheetName": "Analyst Efficiency"
+  },
+  {
+    "key": "eventExtensionIndex",
+    "title": "Event Extension Index",
+    "category": "Event & Investigation",
+    "multiRow": true,
+    "order": 9,
+    "columns": [
+      {
+        "key": "event",
+        "label": "Event",
+        "excelCol": 3,
+        "type": "text",
+        "formula": null
+      },
+      {
+        "key": "totalNoOfEventClose",
+        "label": "Total no of Event Close",
+        "excelCol": 4,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "noOfEventCloseWithInTime",
+        "label": "No of Event Close with in time",
+        "excelCol": 5,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "noOfEventCloseWithOverTimelines",
+        "label": "No of Event Close with over timelines",
+        "excelCol": 6,
+        "type": "computed",
+        "formula": "={totalNoOfEventClose}-{noOfEventCloseWithInTime}"
+      },
+      {
+        "key": "noOfExtensionInEvent",
+        "label": "No of Extension in Event",
+        "excelCol": 7,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "closureWithinSop",
+        "label": "Closure Within SOP (%)",
+        "excelCol": 8,
+        "type": "computed",
+        "formula": "=({noOfEventCloseWithInTime}/{totalNoOfEventClose})*100"
+      }
+    ],
+    "sheetName": "Event Extension Index"
+  },
+  {
+    "key": "auditPerformance",
+    "title": "Audit Performance",
+    "category": "Event & Investigation",
+    "multiRow": true,
+    "order": 10,
+    "columns": [
+      {
+        "key": "nameOfAuthorityDepartmentAuditors",
+        "label": "Name of Authority/ Department (Auditors)",
+        "excelCol": 3,
+        "type": "text",
+        "formula": null
+      },
+      {
+        "key": "typeOfAudit",
+        "label": "Type of Audit",
+        "excelCol": 4,
+        "type": "text",
+        "formula": null
+      },
+      {
+        "key": "startDateDdMmmYy",
+        "label": "Start Date DD-MMM-YY",
+        "excelCol": 5,
+        "type": "date",
+        "formula": null
+      },
+      {
+        "key": "endDateDdMmmYy",
+        "label": "End date DD-MMM-YY",
+        "excelCol": 6,
+        "type": "date",
+        "formula": null
+      },
+      {
+        "key": "reportReceived",
+        "label": "Report Received",
+        "excelCol": 7,
+        "type": "text",
+        "formula": null
+      },
+      {
+        "key": "capaComplianceStatus",
+        "label": "CAPA / Compliance Status",
+        "excelCol": 8,
+        "type": "text",
+        "formula": null
+      },
+      {
+        "key": "approvalStatus",
+        "label": "Approval Status",
+        "excelCol": 9,
+        "type": "text",
+        "formula": null
+      },
+      {
+        "key": "noOfCriticalObservation",
+        "label": "No of critical observation",
+        "excelCol": 10,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "noOfMajorObservation",
+        "label": "No of major observation",
+        "excelCol": 11,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "noOfMinorObservation",
+        "label": "No of minor observation",
+        "excelCol": 12,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "totalNoOfRepeatedObservationNotedByAgenc",
+        "label": "Total no of repeated observation noted by agency/Customer/CQC of that time period",
+        "excelCol": 13,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "remarkIfAny",
+        "label": "Remark (If any)",
+        "excelCol": 14,
+        "type": "text",
+        "formula": null
+      }
+    ],
+    "sheetName": "Audit Performance "
+  },
+  {
+    "key": "marketDepotComplaints",
+    "title": "Market-Depot Complaints",
+    "category": "Market & Product Quality",
+    "multiRow": false,
+    "order": 11,
+    "columns": [
+      {
+        "key": "noOfBatchesDispatchedOnSameTimePeriod",
+        "label": "No. of batches dispatched on same time period",
+        "excelCol": 3,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "noOfMarketCompliantReceivedForProductQua",
+        "label": "No of Market compliant received for Product quality defects",
+        "excelCol": 4,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "ofMarketCompalintLogged",
+        "label": "% of market compalint logged",
+        "excelCol": 5,
+        "type": "computed",
+        "formula": "={noOfMarketCompliantReceivedForProductQua}/{noOfBatchesDispatchedOnSameTimePeriod}"
+      }
+    ],
+    "sheetName": "Market-Depot Complaints"
+  },
+  {
+    "key": "rightFirstTime",
+    "title": "Right-First-Time",
+    "category": "Market & Product Quality",
+    "multiRow": false,
+    "order": 12,
+    "columns": [
+      {
+        "key": "noOfLotsTestedInTheReportingTimeframeB",
+        "label": "No. of lots tested in the reporting timeframe (B)",
+        "excelCol": 3,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "noOfBatchesLotRejectedInSameTimePeriod",
+        "label": "No. of batches/lot rejected in same time period",
+        "excelCol": 4,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "lotAcceptanceRate",
+        "label": "Lot Acceptance Rate (%)",
+        "excelCol": 5,
+        "type": "computed",
+        "formula": "=({noOfLotsTestedInTheReportingTimeframeB}-{noOfBatchesLotRejectedInSameTimePeriod})/{noOfLotsTestedInTheReportingTimeframeB}"
+      },
+      {
+        "key": "noOfBatchesLotReleasedWithoutAnySingleEv",
+        "label": "No. of batches/lot released without any single event that OOS/DEV/OOT/LIR in same time period",
+        "excelCol": 6,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "ofRightFirstTime",
+        "label": "% of Right first time",
+        "excelCol": 7,
+        "type": "computed",
+        "formula": "={noOfBatchesLotReleasedWithoutAnySingleEv}/{noOfLotsTestedInTheReportingTimeframeB}"
+      }
+    ],
+    "sheetName": "Right-First-Time"
+  },
+  {
+    "key": "training",
+    "title": "Training %",
+    "category": "Governance & Sustainability",
+    "multiRow": false,
+    "order": 13,
+    "columns": [
+      {
+        "key": "completionOfSopTraining",
+        "label": "% Completion of SOP Training",
+        "excelCol": 3,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "completionOfGmpTraining",
+        "label": "% Completion of GMP Training",
+        "excelCol": 4,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "completionOfFuntionalTraining",
+        "label": "% Completion of Funtional Training",
+        "excelCol": 5,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "noOfExternalTrainingByOem",
+        "label": "No of External training (By OEM)",
+        "excelCol": 6,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "nameOfExternalTrainingByAgencySme",
+        "label": "Name of External training (by agency/SME)",
+        "excelCol": 7,
+        "type": "text",
+        "formula": null
+      }
+    ],
+    "sheetName": "Training %"
+  },
+  {
+    "key": "lotAcceptanceRateSop019",
+    "title": "Lot Acceptance Rate (SOP-019)",
+    "category": "Market & Product Quality",
+    "multiRow": false,
+    "order": 14,
+    "columns": [
+      {
+        "key": "noOfLotsSaleableTestedInTheReportingTime",
+        "label": "No. of lots (saleable) tested in the reporting timeframe (B)",
+        "excelCol": 3,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "noOfBatchesLotRejectedInSameTimePeriod",
+        "label": "No. of batches/lot rejected in same time period",
+        "excelCol": 4,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "lotAcceptanceRate",
+        "label": "Lot Acceptance Rate (%)",
+        "excelCol": 5,
+        "type": "computed",
+        "formula": "=({noOfLotsSaleableTestedInTheReportingTime}-{noOfBatchesLotRejectedInSameTimePeriod})/{noOfLotsSaleableTestedInTheReportingTime}"
+      }
+    ],
+    "sheetName": "Lot Acceptance Rate (SOP-019)"
+  },
+  {
+    "key": "pqcrAsPerSop019",
+    "title": "PQCR (As per SOP-019)",
+    "category": "Market & Product Quality",
+    "multiRow": false,
+    "order": 15,
+    "columns": [
+      {
+        "key": "numberOfCustomerComplaintReceivedForAPro",
+        "label": "Number of Customer Complaint Received for a Product (No. of Batches) in the reporting timeframe",
+        "excelCol": 3,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "totalNumberOfBatchesDistributedInTheRepo",
+        "label": "Total number of batches distributed in the reporting timeframe",
+        "excelCol": 4,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "acceptanceRate",
+        "label": "%Acceptance Rate",
+        "excelCol": 5,
+        "type": "computed",
+        "formula": "={numberOfCustomerComplaintReceivedForAPro}/{totalNumberOfBatchesDistributedInTheRepo}"
+      }
+    ],
+    "sheetName": "PQCR (As per SOP-019) "
+  },
+  {
+    "key": "ioosrAsPerSop019",
+    "title": "IOOSR (As per SOP_019)",
+    "category": "Market & Product Quality",
+    "multiRow": false,
+    "order": 16,
+    "columns": [
+      {
+        "key": "numberOfInvalidateOosTestResultsInCommer",
+        "label": "Number of invalidate OOS test results (In Commercial Finished Product & Long-term Stability Analysis )",
+        "excelCol": 3,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "totalNumberOfOosClosedInCommercialFinish",
+        "label": "Total number of OOS closed (In Commercial Finished Product & Long-term Stability Analysis)",
+        "excelCol": 4,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "ioosr",
+        "label": "% IOOSR",
+        "excelCol": 5,
+        "type": "computed",
+        "formula": "={numberOfInvalidateOosTestResultsInCommer}/{totalNumberOfOosClosedInCommercialFinish}"
+      }
+    ],
+    "sheetName": "IOOSR (As per SOP_019)"
+  },
+  {
+    "key": "pqrcrAsPerSop019",
+    "title": "PQRCR (As per SOP-019)",
+    "category": "Market & Product Quality",
+    "multiRow": false,
+    "order": 17,
+    "columns": [
+      {
+        "key": "numberOfApqrCompletedInTheReportingTimef",
+        "label": "Number of APQR completed in the reporting timeframe",
+        "excelCol": 3,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "numberOfApqrScheduledInTheReportingTimef",
+        "label": "Number of APQR scheduled in the reporting timeframe",
+        "excelCol": 4,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "totalCompleton",
+        "label": "Total completon",
+        "excelCol": 5,
+        "type": "computed",
+        "formula": "={numberOfApqrCompletedInTheReportingTimef}/{numberOfApqrScheduledInTheReportingTimef}"
+      }
+    ],
+    "sheetName": "PQRCR (As per SOP-019)"
+  },
+  {
+    "key": "timeLineCompliance",
+    "title": "Time Line compliance",
+    "category": "Event & Investigation",
+    "multiRow": true,
+    "order": 18,
+    "columns": [
+      {
+        "key": "relatedEvents",
+        "label": "Related Events",
+        "excelCol": 3,
+        "type": "text",
+        "formula": null
+      },
+      {
+        "key": "numberOfEventClosureWithInSopDefinedTime",
+        "label": "Number of event closure with in SOP defined timeline",
+        "excelCol": 4,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "totalNumberEventClosureDone",
+        "label": "Total number event closure done",
+        "excelCol": 5,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "compliance",
+        "label": "%Compliance",
+        "excelCol": 6,
+        "type": "computed",
+        "formula": "={numberOfEventClosureWithInSopDefinedTime}/{totalNumberEventClosureDone}"
+      }
+    ],
+    "sheetName": "Time Line compliance"
+  },
+  {
+    "key": "equipmentQualification",
+    "title": "Equipment Qualification",
+    "category": "Qualification/Validation",
+    "multiRow": true,
+    "order": 19,
+    "columns": [
+      {
+        "key": "typeOfActivities",
+        "label": "Type of Activities",
+        "excelCol": 3,
+        "type": "text",
+        "formula": null
+      },
+      {
+        "key": "productSegment",
+        "label": "Product Segment",
+        "excelCol": 4,
+        "type": "text",
+        "formula": null
+      },
+      {
+        "key": "noSActivitiesInitiatedReportingMonth",
+        "label": "No.'s Activities Initiated (reporting month)",
+        "excelCol": 5,
+        "type": "text",
+        "formula": null
+      },
+      {
+        "key": "carryForwardFromPreviousMonthS",
+        "label": "Carry Forward from Previous Month(s)",
+        "excelCol": 6,
+        "type": "text",
+        "formula": null
+      },
+      {
+        "key": "activitiesCompleted",
+        "label": "Activities Completed",
+        "excelCol": 7,
+        "type": "text",
+        "formula": null
+      },
+      {
+        "key": "activitiesUProgress",
+        "label": "Activities U/Progress",
+        "excelCol": 8,
+        "type": "text",
+        "formula": null
+      },
+      {
+        "key": "remarks",
+        "label": "Remarks",
+        "excelCol": 9,
+        "type": "text",
+        "formula": null
+      }
+    ],
+    "sheetName": "Equipment Qualification "
+  },
+  {
+    "key": "manPowerStatus",
+    "title": "Man Power status",
+    "category": "Manpower",
+    "multiRow": true,
+    "order": 20,
+    "columns": [
+      {
+        "key": "department",
+        "label": "Department",
+        "excelCol": 3,
+        "type": "text",
+        "formula": null
+      },
+      {
+        "key": "budgetedManpower",
+        "label": "Budgeted manpower",
+        "excelCol": 4,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "existingManpowerAsOnDate",
+        "label": "Existing Manpower as on Date",
+        "excelCol": 5,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "underResignation",
+        "label": "Under Resignation",
+        "excelCol": 6,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "leavedOrganization",
+        "label": "Leaved organization",
+        "excelCol": 7,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "newJoineeStatus",
+        "label": "New Joinee Status",
+        "excelCol": 8,
+        "type": "number",
+        "formula": null
+      },
+      {
+        "key": "remarks",
+        "label": "Remarks",
+        "excelCol": 9,
+        "type": "text",
+        "formula": null
+      }
+    ],
+    "sheetName": "Man Power status"
+  }
+];
+
+export const SCORECARD_CATEGORIES = [...new Set(SCORECARD_SCHEMA.map(m => m.category))];
+
+export function metricByKey(key) {
+  return SCORECARD_SCHEMA.find(m => m.key === key) || null;
+}
+
+export function inputColumns(metric) {
+  return metric ? metric.columns.filter(c => c.type !== 'computed') : [];
+}
+
+export function computedColumns(metric) {
+  return metric ? metric.columns.filter(c => c.type === 'computed') : [];
+}
+
+// ---- Client-side formula engine: live preview of computed cells while typing ----
+// Mirrors backend ScorecardFormula.cs. Returns a map columnKey -> number|null.
+export function computeRow(metric, raw) {
+  const nums = {};
+  for (const col of metric.columns) {
+    if (col.type === 'number') {
+      const v = raw[col.key];
+      const n = v === '' || v === undefined || v === null ? null : Number(v);
+      nums[col.key] = Number.isFinite(n) ? n : null;
     }
+  }
+  for (const col of metric.columns) {
+    if (col.type === 'computed') nums[col.key] = evalFormula(col.formula, nums);
+  }
+  return nums;
+}
 
-    public class ScMetric
-    {
-        public string Key { get; set; } = "";
-        public string Title { get; set; } = "";
-        public string Category { get; set; } = "";
-        public string SheetName { get; set; } = "";  // exact tab name in the template/upload
-        public bool MultiRow { get; set; }
-        public int Order { get; set; }
-        public List<ScColumn> Columns { get; set; } = new();
-    }
+function evalFormula(formula, values) {
+  if (!formula) return null;
+  let expr = formula.replace(/^=/, '').trim();
+  expr = expr.replace(/SUM\(([^)]*)\)/gi, (_, inner) =>
+    '(' + inner.split(/[:+,]/).map(s => s.trim()).join('+') + ')');
+  let missing = false;
+  expr = expr.replace(/\{([A-Za-z0-9_]+)\}/g, (_, key) => {
+    const v = values[key];
+    if (v === null || v === undefined) { missing = true; return '0'; }
+    return String(v);
+  });
+  if (missing) return null;
+  if (!/^[0-9eE+\-*/(). ]+$/.test(expr)) return null;
+  try {
+    // eslint-disable-next-line no-new-func
+    const val = Function('"use strict";return (' + expr + ')')();
+    if (!Number.isFinite(val)) return null;
+    return Math.round(val * 10000) / 10000;
+  } catch {
+    return null;
+  }
+}
 
-    public static class ScorecardSchema
-    {
-        public static readonly List<ScMetric> Metrics = new()
-        {
-            new ScMetric {
-                Key = "humanError", Title = "Human Error", Category = "Quality & Compliance",
-                SheetName = "Human Error", MultiRow = true, Order = 1,
-                Columns = new() {
-                    new ScColumn { Key = "relatedEvents", Label = "Related Events", Type = ScColType.Text },
-                    new ScColumn { Key = "noOfEventClosedInTimePeriod", Label = "No of Event Closed in Time period", Type = ScColType.Number },
-                    new ScColumn { Key = "rootCauseAsHumanErrror", Label = "Root cause as Human Errror", Type = ScColType.Number },
-                    new ScColumn { Key = "ofHumanError", Label = "% of Human Error", Type = ScColType.Computed, Formula = "={rootCauseAsHumanErrror}/{noOfEventClosedInTimePeriod}" },
-                }
-            },
-            new ScMetric {
-                Key = "oosRate", Title = "OOS Rate (%)", Category = "Quality & Compliance",
-                SheetName = "OOS Rate (%)", MultiRow = false, Order = 2,
-                Columns = new() {
-                    new ScColumn { Key = "noOfBatchSampleAnalyzedInQcArNo", Label = "No of Batch sample analyzed in QC (AR No.)", Type = ScColType.Number },
-                    new ScColumn { Key = "noOfInvalidOosClosedInTimePeriod", Label = "No of Invalid OOS Closed in Time period", Type = ScColType.Number },
-                    new ScColumn { Key = "noOfValidOosClosedInTimePeriod", Label = "No of valid OOS Closed in Time period", Type = ScColType.Number },
-                    new ScColumn { Key = "totalOosClosed", Label = "Total OOS Closed", Type = ScColType.Computed, Formula = "=SUM({noOfInvalidOosClosedInTimePeriod}:{noOfValidOosClosedInTimePeriod})" },
-                    new ScColumn { Key = "invalidOos", Label = "% Invalid OOS", Type = ScColType.Computed, Formula = "={noOfInvalidOosClosedInTimePeriod}/{noOfBatchSampleAnalyzedInQcArNo}" },
-                    new ScColumn { Key = "validOos", Label = "% valid OOS", Type = ScColType.Computed, Formula = "={noOfValidOosClosedInTimePeriod}/{noOfBatchSampleAnalyzedInQcArNo}" },
-                    new ScColumn { Key = "overallOos", Label = "%overall OOS", Type = ScColType.Computed, Formula = "={totalOosClosed}/{noOfBatchSampleAnalyzedInQcArNo}" },
-                }
-            },
-            new ScMetric {
-                Key = "deviationRate", Title = "Deviation Rate", Category = "Quality & Compliance",
-                SheetName = "Deviation Rate", MultiRow = false, Order = 3,
-                Columns = new() {
-                    new ScColumn { Key = "noOfBatchesMgfPkg", Label = "No of Batches (Mgf & Pkg)", Type = ScColType.Number },
-                    new ScColumn { Key = "totalDeviationReportedInTimePeriod", Label = "Total Deviation reported in time period", Type = ScColType.Number },
-                    new ScColumn { Key = "deviation", Label = "% Deviation", Type = ScColType.Computed, Formula = "=SUM({totalDeviationReportedInTimePeriod}/{noOfBatchesMgfPkg})" },
-                }
-            },
-            new ScMetric {
-                Key = "lir", Title = "LIR", Category = "Quality & Compliance",
-                SheetName = "LIR", MultiRow = false, Order = 4,
-                Columns = new() {
-                    new ScColumn { Key = "noOfBatchSampleAnalyzedInQcArNo", Label = "No of Batch sample analyzed in QC (AR No.)", Type = ScColType.Number },
-                    new ScColumn { Key = "noOfLirReportedAfterSamples", Label = "No of LIR reported After Samples", Type = ScColType.Number },
-                    new ScColumn { Key = "noOfLirReportedBeforeSamples", Label = "No of LIR reported Before samples", Type = ScColType.Number },
-                    new ScColumn { Key = "totalNoOfLirReportedInTimePeriod", Label = "Total No of LIR reported in time period", Type = ScColType.Computed, Formula = "={noOfLirReportedAfterSamples}+{noOfLirReportedBeforeSamples}" },
-                    new ScColumn { Key = "lir", Label = "% LIR", Type = ScColType.Computed, Formula = "=SUM({totalNoOfLirReportedInTimePeriod}/{noOfBatchSampleAnalyzedInQcArNo})" },
-                }
-            },
-            new ScMetric {
-                Key = "repetitiveEvents", Title = "Repetitive Events (%)", Category = "Quality & Compliance",
-                SheetName = "Repetitive Events (%)", MultiRow = true, Order = 5,
-                Columns = new() {
-                    new ScColumn { Key = "events", Label = "Events", Type = ScColType.Text },
-                    new ScColumn { Key = "totalNoOfEventClosed", Label = "Total no of Event Closed", Type = ScColType.Number },
-                    new ScColumn { Key = "noOfRepetativeEventBasedOnProductForRepe", Label = "No of Repetative Event based on product (for repetative nature- follow SOP time period)", Type = ScColType.Number },
-                    new ScColumn { Key = "repetitiveBasedOnProduct", Label = "% Repetitive Based on Product", Type = ScColType.Computed, Formula = "={noOfRepetativeEventBasedOnProductForRepe}/{totalNoOfEventClosed}" },
-                    new ScColumn { Key = "noOfRepetativeEventBasedOnSimilarRootCau", Label = "No of Repetative Event based on similar Root cause (RCA) in time period (for repetative nature- follow SOP time period)", Type = ScColType.Number },
-                    new ScColumn { Key = "repetitiveBasedOnRca", Label = "% Repetitive based on RCA", Type = ScColType.Computed, Formula = "={noOfRepetativeEventBasedOnSimilarRootCau}/{totalNoOfEventClosed}" },
-                }
-            },
-            new ScMetric {
-                Key = "hplcOccupancy", Title = "HPLC Occupancy (%)", Category = "Laboratory Performance",
-                SheetName = "HPLC Occupancy (%)", MultiRow = false, Order = 6,
-                Columns = new() {
-                    new ScColumn { Key = "totalNoOfHplcA", Label = "Total no of HPLC (A)", Type = ScColType.Number },
-                    new ScColumn { Key = "actualHplcRunHour", Label = "Actual HPLC Run (Hour)", Type = ScColType.Number },
-                    new ScColumn { Key = "noOfWorkingDaysAtSiteByConsideringSiteWo", Label = "No of working Days at site (By considering site working for 30 days)", Type = ScColType.Number },
-                    new ScColumn { Key = "standardHrsDay", Label = "Standard hrs @ day", Type = ScColType.Number },
-                    new ScColumn { Key = "totalStandardTimeInHour3024A", Label = "Total standard Time in (Hour) (30*24*A)", Type = ScColType.Computed, Formula = "={standardHrsDay}*{noOfWorkingDaysAtSiteByConsideringSiteWo}*{totalNoOfHplcA}" },
-                    new ScColumn { Key = "hplcOccupancy", Label = "%HPLC Occupancy", Type = ScColType.Computed, Formula = "={actualHplcRunHour}/{totalStandardTimeInHour3024A}" },
-                }
-            },
-            new ScMetric {
-                Key = "gcOccupancy", Title = "GC Occupancy (%)", Category = "Laboratory Performance",
-                SheetName = "GC Occupancy (%)", MultiRow = false, Order = 7,
-                Columns = new() {
-                    new ScColumn { Key = "totalNoOfGcA", Label = "Total no of GC (A)", Type = ScColType.Number },
-                    new ScColumn { Key = "actualGcRunHour", Label = "Actual GC Run (Hour)", Type = ScColType.Number },
-                    new ScColumn { Key = "noOfWorkingDaysAtSiteByConsideringSiteWo", Label = "No of working Days at site (By considering site working for 30 days)", Type = ScColType.Number },
-                    new ScColumn { Key = "standardHrsDay", Label = "Standard hrs @ day", Type = ScColType.Number },
-                    new ScColumn { Key = "totalStandardTimeInHour3024A", Label = "Total standard Time in (Hour) (30*24*A)", Type = ScColType.Computed, Formula = "={standardHrsDay}*{noOfWorkingDaysAtSiteByConsideringSiteWo}*{totalNoOfGcA}" },
-                    new ScColumn { Key = "gcOccupancy", Label = "%GC Occupancy", Type = ScColType.Computed, Formula = "={actualGcRunHour}/{totalStandardTimeInHour3024A}" },
-                }
-            },
-            new ScMetric {
-                Key = "analystEfficiency", Title = "Analyst Efficiency", Category = "Laboratory Performance",
-                SheetName = "Analyst Efficiency", MultiRow = false, Order = 8,
-                Columns = new() {
-                    new ScColumn { Key = "totalNoOfSampleReceivedForTesting", Label = "Total no of sample received for testing", Type = ScColType.Number },
-                    new ScColumn { Key = "totalNoOfSampleAnalysed", Label = "Total no of sample analysed", Type = ScColType.Number },
-                    new ScColumn { Key = "totalNoOfAnalystInLab", Label = "Total no of analyst in LAB", Type = ScColType.Number },
-                    new ScColumn { Key = "totalNoOfWorkingDays", Label = "Total no of working days", Type = ScColType.Number },
-                    new ScColumn { Key = "analystEfficiency", Label = "% Analyst Efficiency", Type = ScColType.Computed, Formula = "={totalNoOfSampleAnalysed}/({totalNoOfAnalystInLab}*{totalNoOfWorkingDays})" },
-                }
-            },
-            new ScMetric {
-                Key = "eventExtensionIndex", Title = "Event Extension Index", Category = "Event & Investigation",
-                SheetName = "Event Extension Index", MultiRow = true, Order = 9,
-                Columns = new() {
-                    new ScColumn { Key = "event", Label = "Event", Type = ScColType.Text },
-                    new ScColumn { Key = "totalNoOfEventClose", Label = "Total no of Event Close", Type = ScColType.Number },
-                    new ScColumn { Key = "noOfEventCloseWithInTime", Label = "No of Event Close with in time", Type = ScColType.Number },
-                    new ScColumn { Key = "noOfEventCloseWithOverTimelines", Label = "No of Event Close with over timelines", Type = ScColType.Computed, Formula = "={totalNoOfEventClose}-{noOfEventCloseWithInTime}" },
-                    new ScColumn { Key = "noOfExtensionInEvent", Label = "No of Extension in Event", Type = ScColType.Number },
-                    new ScColumn { Key = "closureWithinSop", Label = "Closure Within SOP (%)", Type = ScColType.Computed, Formula = "=({noOfEventCloseWithInTime}/{totalNoOfEventClose})*100" },
-                }
-            },
-            new ScMetric {
-                Key = "auditPerformance", Title = "Audit Performance", Category = "Event & Investigation",
-                SheetName = "Audit Performance ", MultiRow = true, Order = 10,
-                Columns = new() {
-                    new ScColumn { Key = "nameOfAuthorityDepartmentAuditors", Label = "Name of Authority/ Department (Auditors)", Type = ScColType.Text },
-                    new ScColumn { Key = "typeOfAudit", Label = "Type of Audit", Type = ScColType.Text },
-                    new ScColumn { Key = "startDateDdMmmYy", Label = "Start Date DD-MMM-YY", Type = ScColType.Date },
-                    new ScColumn { Key = "endDateDdMmmYy", Label = "End date DD-MMM-YY", Type = ScColType.Date },
-                    new ScColumn { Key = "reportReceived", Label = "Report Received", Type = ScColType.Text },
-                    new ScColumn { Key = "capaComplianceStatus", Label = "CAPA / Compliance Status", Type = ScColType.Text },
-                    new ScColumn { Key = "approvalStatus", Label = "Approval Status", Type = ScColType.Text },
-                    new ScColumn { Key = "noOfCriticalObservation", Label = "No of critical observation", Type = ScColType.Number },
-                    new ScColumn { Key = "noOfMajorObservation", Label = "No of major observation", Type = ScColType.Number },
-                    new ScColumn { Key = "noOfMinorObservation", Label = "No of minor observation", Type = ScColType.Number },
-                    new ScColumn { Key = "totalNoOfRepeatedObservationNotedByAgenc", Label = "Total no of repeated observation noted by agency/Customer/CQC of that time period", Type = ScColType.Number },
-                    new ScColumn { Key = "remarkIfAny", Label = "Remark (If any)", Type = ScColType.Text },
-                }
-            },
-            new ScMetric {
-                Key = "marketDepotComplaints", Title = "Market-Depot Complaints", Category = "Market & Product Quality",
-                SheetName = "Market-Depot Complaints", MultiRow = false, Order = 11,
-                Columns = new() {
-                    new ScColumn { Key = "noOfBatchesDispatchedOnSameTimePeriod", Label = "No. of batches dispatched on same time period", Type = ScColType.Number },
-                    new ScColumn { Key = "noOfMarketCompliantReceivedForProductQua", Label = "No of Market compliant received for Product quality defects", Type = ScColType.Number },
-                    new ScColumn { Key = "ofMarketCompalintLogged", Label = "% of market compalint logged", Type = ScColType.Computed, Formula = "={noOfMarketCompliantReceivedForProductQua}/{noOfBatchesDispatchedOnSameTimePeriod}" },
-                }
-            },
-            new ScMetric {
-                Key = "rightFirstTime", Title = "Right-First-Time", Category = "Market & Product Quality",
-                SheetName = "Right-First-Time", MultiRow = false, Order = 12,
-                Columns = new() {
-                    new ScColumn { Key = "noOfLotsTestedInTheReportingTimeframeB", Label = "No. of lots tested in the reporting timeframe (B)", Type = ScColType.Number },
-                    new ScColumn { Key = "noOfBatchesLotRejectedInSameTimePeriod", Label = "No. of batches/lot rejected in same time period", Type = ScColType.Number },
-                    new ScColumn { Key = "lotAcceptanceRate", Label = "Lot Acceptance Rate (%)", Type = ScColType.Computed, Formula = "=({noOfLotsTestedInTheReportingTimeframeB}-{noOfBatchesLotRejectedInSameTimePeriod})/{noOfLotsTestedInTheReportingTimeframeB}" },
-                    new ScColumn { Key = "noOfBatchesLotReleasedWithoutAnySingleEv", Label = "No. of batches/lot released without any single event that OOS/DEV/OOT/LIR in same time period", Type = ScColType.Number },
-                    new ScColumn { Key = "ofRightFirstTime", Label = "% of Right first time", Type = ScColType.Computed, Formula = "={noOfBatchesLotReleasedWithoutAnySingleEv}/{noOfLotsTestedInTheReportingTimeframeB}" },
-                }
-            },
-            new ScMetric {
-                Key = "training", Title = "Training %", Category = "Governance & Sustainability",
-                SheetName = "Training %", MultiRow = false, Order = 13,
-                Columns = new() {
-                    new ScColumn { Key = "completionOfSopTraining", Label = "% Completion of SOP Training", Type = ScColType.Number },
-                    new ScColumn { Key = "completionOfGmpTraining", Label = "% Completion of GMP Training", Type = ScColType.Number },
-                    new ScColumn { Key = "completionOfFuntionalTraining", Label = "% Completion of Funtional Training", Type = ScColType.Number },
-                    new ScColumn { Key = "noOfExternalTrainingByOem", Label = "No of External training (By OEM)", Type = ScColType.Number },
-                    new ScColumn { Key = "nameOfExternalTrainingByAgencySme", Label = "Name of External training (by agency/SME)", Type = ScColType.Text },
-                }
-            },
-            new ScMetric {
-                Key = "lotAcceptanceRateSop019", Title = "Lot Acceptance Rate (SOP-019)", Category = "Market & Product Quality",
-                SheetName = "Lot Acceptance Rate (SOP-019)", MultiRow = false, Order = 14,
-                Columns = new() {
-                    new ScColumn { Key = "noOfLotsSaleableTestedInTheReportingTime", Label = "No. of lots (saleable) tested in the reporting timeframe (B)", Type = ScColType.Number },
-                    new ScColumn { Key = "noOfBatchesLotRejectedInSameTimePeriod", Label = "No. of batches/lot rejected in same time period", Type = ScColType.Number },
-                    new ScColumn { Key = "lotAcceptanceRate", Label = "Lot Acceptance Rate (%)", Type = ScColType.Computed, Formula = "=({noOfLotsSaleableTestedInTheReportingTime}-{noOfBatchesLotRejectedInSameTimePeriod})/{noOfLotsSaleableTestedInTheReportingTime}" },
-                }
-            },
-            new ScMetric {
-                Key = "pqcrAsPerSop019", Title = "PQCR (As per SOP-019)", Category = "Market & Product Quality",
-                SheetName = "PQCR (As per SOP-019) ", MultiRow = false, Order = 15,
-                Columns = new() {
-                    new ScColumn { Key = "numberOfCustomerComplaintReceivedForAPro", Label = "Number of Customer Complaint Received for a Product (No. of Batches) in the reporting timeframe", Type = ScColType.Number },
-                    new ScColumn { Key = "totalNumberOfBatchesDistributedInTheRepo", Label = "Total number of batches distributed in the reporting timeframe", Type = ScColType.Number },
-                    new ScColumn { Key = "acceptanceRate", Label = "%Acceptance Rate", Type = ScColType.Computed, Formula = "={numberOfCustomerComplaintReceivedForAPro}/{totalNumberOfBatchesDistributedInTheRepo}" },
-                }
-            },
-            new ScMetric {
-                Key = "ioosrAsPerSop019", Title = "IOOSR (As per SOP_019)", Category = "Market & Product Quality",
-                SheetName = "IOOSR (As per SOP_019)", MultiRow = false, Order = 16,
-                Columns = new() {
-                    new ScColumn { Key = "numberOfInvalidateOosTestResultsInCommer", Label = "Number of invalidate OOS test results (In Commercial Finished Product & Long-term Stability Analysis )", Type = ScColType.Number },
-                    new ScColumn { Key = "totalNumberOfOosClosedInCommercialFinish", Label = "Total number of OOS closed (In Commercial Finished Product & Long-term Stability Analysis)", Type = ScColType.Number },
-                    new ScColumn { Key = "ioosr", Label = "% IOOSR", Type = ScColType.Computed, Formula = "={numberOfInvalidateOosTestResultsInCommer}/{totalNumberOfOosClosedInCommercialFinish}" },
-                }
-            },
-            new ScMetric {
-                Key = "pqrcrAsPerSop019", Title = "PQRCR (As per SOP-019)", Category = "Market & Product Quality",
-                SheetName = "PQRCR (As per SOP-019)", MultiRow = false, Order = 17,
-                Columns = new() {
-                    new ScColumn { Key = "numberOfApqrCompletedInTheReportingTimef", Label = "Number of APQR completed in the reporting timeframe", Type = ScColType.Number },
-                    new ScColumn { Key = "numberOfApqrScheduledInTheReportingTimef", Label = "Number of APQR scheduled in the reporting timeframe", Type = ScColType.Number },
-                    new ScColumn { Key = "totalCompleton", Label = "Total completon", Type = ScColType.Computed, Formula = "={numberOfApqrCompletedInTheReportingTimef}/{numberOfApqrScheduledInTheReportingTimef}" },
-                }
-            },
-            new ScMetric {
-                Key = "timeLineCompliance", Title = "Time Line compliance", Category = "Event & Investigation",
-                SheetName = "Time Line compliance", MultiRow = true, Order = 18,
-                Columns = new() {
-                    new ScColumn { Key = "relatedEvents", Label = "Related Events", Type = ScColType.Text },
-                    new ScColumn { Key = "numberOfEventClosureWithInSopDefinedTime", Label = "Number of event closure with in SOP defined timeline", Type = ScColType.Number },
-                    new ScColumn { Key = "totalNumberEventClosureDone", Label = "Total number event closure done", Type = ScColType.Number },
-                    new ScColumn { Key = "compliance", Label = "%Compliance", Type = ScColType.Computed, Formula = "={numberOfEventClosureWithInSopDefinedTime}/{totalNumberEventClosureDone}" },
-                }
-            },
-            new ScMetric {
-                Key = "equipmentQualification", Title = "Equipment Qualification", Category = "Qualification/Validation",
-                SheetName = "Equipment Qualification ", MultiRow = true, Order = 19,
-                Columns = new() {
-                    new ScColumn { Key = "typeOfActivities", Label = "Type of Activities", Type = ScColType.Text },
-                    new ScColumn { Key = "productSegment", Label = "Product Segment", Type = ScColType.Text },
-                    new ScColumn { Key = "noSActivitiesInitiatedReportingMonth", Label = "No.'s Activities Initiated (reporting month)", Type = ScColType.Text },
-                    new ScColumn { Key = "carryForwardFromPreviousMonthS", Label = "Carry Forward from Previous Month(s)", Type = ScColType.Text },
-                    new ScColumn { Key = "activitiesCompleted", Label = "Activities Completed", Type = ScColType.Text },
-                    new ScColumn { Key = "activitiesUProgress", Label = "Activities U/Progress", Type = ScColType.Text },
-                    new ScColumn { Key = "remarks", Label = "Remarks", Type = ScColType.Text },
-                }
-            },
-            new ScMetric {
-                Key = "manPowerStatus", Title = "Man Power status", Category = "Manpower",
-                SheetName = "Man Power status", MultiRow = true, Order = 20,
-                Columns = new() {
-                    new ScColumn { Key = "department", Label = "Department", Type = ScColType.Text },
-                    new ScColumn { Key = "budgetedManpower", Label = "Budgeted manpower", Type = ScColType.Number },
-                    new ScColumn { Key = "existingManpowerAsOnDate", Label = "Existing Manpower as on Date", Type = ScColType.Number },
-                    new ScColumn { Key = "underResignation", Label = "Under Resignation", Type = ScColType.Number },
-                    new ScColumn { Key = "leavedOrganization", Label = "Leaved organization", Type = ScColType.Number },
-                    new ScColumn { Key = "newJoineeStatus", Label = "New Joinee Status", Type = ScColType.Number },
-                    new ScColumn { Key = "remarks", Label = "Remarks", Type = ScColType.Text },
-                }
-            },
-        };
-
-        public static ScMetric? Find(string key) =>
-            Metrics.FirstOrDefault(x => string.Equals(x.Key, key, System.StringComparison.OrdinalIgnoreCase));
-
-        public static ScMetric? FindBySheet(string sheetName)
-        {
-            var n = sheetName.Trim();
-            return Metrics.FirstOrDefault(x =>
-                string.Equals(x.SheetName.Trim(), n, System.StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(x.Title.Trim(), n, System.StringComparison.OrdinalIgnoreCase));
-        }
-    }
+export function formatCell(value) {
+  if (value === null || value === undefined || value === '') return '-';
+  return String(value);
 }
