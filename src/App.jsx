@@ -8,6 +8,9 @@ import InitiativesPage from './page/InitiativesPage'
 import CostSavingsPage from './page/CostSavingsPage'
 import SitesAndPeriodsPage from './page/SitesAndPeriodsPage'
 import ExcelImportPage from './page/ExcellImportPage'
+import ScorecardEntryPage from './page/ScorecardEntryPage'
+import ScorecardAnalyticsPage from './page/ScorecardAnalyticsPage'
+import ScorecardImportPage from './page/ScorecardImportPage'
 
 const NAV_LINKS = [
   { to: '/dashboard', label: 'Dashboard' },
@@ -15,6 +18,9 @@ const NAV_LINKS = [
   { to: '/training', label: 'Training' },
   { to: '/initiatives', label: 'Initiatives' },
   { to: '/cost-savings', label: 'Cost Savings' },
+  { to: '/scorecard', label: 'Scorecard' },
+  { to: '/scorecard-analytics', label: 'Scorecard Analytics' },
+  { to: '/scorecard-import', label: 'Scorecard Import' },
   { to: '/sites-periods', label: 'Sites & Periods' },
   { to: '/excel-import', label: 'Excel Import' }
 ]
@@ -43,6 +49,9 @@ export default function App() {
             <Route path="/training" element={<TrainingPage />} />
             <Route path="/initiatives" element={<InitiativesPage />} />
             <Route path="/cost-savings" element={<CostSavingsPage />} />
+            <Route path="/scorecard" element={<ScorecardEntryPage />} />
+            <Route path="/scorecard-analytics" element={<ScorecardAnalyticsPage />} />
+            <Route path="/scorecard-import" element={<ScorecardImportPage />} />
             <Route path="/sites-periods" element={<SitesAndPeriodsPage />} />
             <Route path="/excel-import" element={<ExcelImportPage />} />
           </Routes>
