@@ -1,5 +1,5 @@
 import React from 'react'
-import { BrowserRouter, NavLink, Route, Routes, Navigate } from 'react-router-dom'
+import { BrowserRouter, NavLink, Route, Routes, Navigate, useLocation } from 'react-router-dom'
 import { AppProvider } from './context/AppContext'
 import DashboardPage from './page/DashboardPage'
 import AnalyticsPage from './page/AnalyticsPage'
@@ -12,35 +12,88 @@ import ScorecardEntryPage from './page/ScorecardEntryPage'
 import ScorecardAnalyticsPage from './page/ScorecardAnalyticsPage'
 import ScorecardImportPage from './page/ScorecardImportPage'
 
-const NAV_LINKS = [
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/analytics', label: 'Analytics' },
-  { to: '/training', label: 'Training' },
-  { to: '/initiatives', label: 'Initiatives' },
-  { to: '/cost-savings', label: 'Cost Savings' },
-  { to: '/scorecard', label: 'Scorecard' },
-  { to: '/scorecard-analytics', label: 'Scorecard Analytics' },
-  { to: '/scorecard-import', label: 'Scorecard Import' },
-  { to: '/sites-periods', label: 'Sites & Periods' },
-  { to: '/excel-import', label: 'Excel Import' }
+// Two top-level modules, each with its own set of sub-tabs.
+// QBX Data = the original report suite; MR Data = the Monthly Site Scorecard.
+const MODULES = [
+  {
+    key: 'qbx',
+    label: 'QBX Data',
+    hint: 'Reports, training, initiatives & cost savings',
+    links: [
+      { to: '/dashboard', label: 'Dashboard' },
+      { to: '/analytics', label: 'Analytics' },
+      { to: '/training', label: 'Training' },
+      { to: '/initiatives', label: 'Initiatives' },
+      { to: '/cost-savings', label: 'Cost Savings' },
+      { to: '/sites-periods', label: 'Sites & Periods' },
+      { to: '/excel-import', label: 'Excel Import' }
+    ]
+  },
+  {
+    key: 'mr',
+    label: 'MR Data',
+    hint: 'Monthly Site Scorecard \u2014 entry, analytics & import',
+    links: [
+      { to: '/scorecard', label: 'Scorecard' },
+      { to: '/scorecard-analytics', label: 'Scorecard Analytics' },
+      { to: '/scorecard-import', label: 'Scorecard Import' }
+    ]
+  }
 ]
+
+// Which module owns the current route (so refresh / deep-link keeps the right module open).
+function moduleForPath(pathname) {
+  const inMr = MODULES[1].links.some((l) => pathname.startsWith(l.to))
+  return inMr ? 'mr' : 'qbx'
+}
+
+function Navigation() {
+  const location = useLocation()
+  const activeModuleKey = moduleForPath(location.pathname)
+  const activeModule = MODULES.find((m) => m.key === activeModuleKey) || MODULES[0]
+
+  return (
+    <div className="module-nav">
+      {/* ---- Module tiles ---- */}
+      <div className="module-tiles">
+        {MODULES.map((mod) => {
+          const isActive = mod.key === activeModuleKey
+          // Selecting a module jumps to its first tab.
+          return (
+            <NavLink
+              key={mod.key}
+              to={mod.links[0].to}
+              className={`module-tile${isActive ? ' active' : ''}`}
+            >
+              <span className="module-tile-label">{mod.label}</span>
+              <span className="module-tile-hint">{mod.hint}</span>
+            </NavLink>
+          )
+        })}
+      </div>
+
+      {/* ---- Sub-tabs for the active module ---- */}
+      <div className="submodule-tabs">
+        {activeModule.links.map((link) => (
+          <NavLink
+            key={link.to}
+            to={link.to}
+            className={({ isActive }) => `subtab${isActive ? ' active' : ''}`}
+          >
+            {link.label}
+          </NavLink>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function App() {
   return (
     <BrowserRouter>
       <AppProvider>
         <div className="app-shell">
-          <nav className="nav">
-            {NAV_LINKS.map((link) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                className={({ isActive }) => (isActive ? 'active' : undefined)}
-              >
-                {link.label}
-              </NavLink>
-            ))}
-          </nav>
+          <Navigation />
 
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
