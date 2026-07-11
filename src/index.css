@@ -677,3 +677,142 @@ textarea {
   max-width: 480px;
   box-shadow: 0 20px 60px rgba(15, 23, 42, 0.3);
 }
+
+/* ============================================================
+   Left sidebar navigation (QBX Data / MR Data groups)
+   ============================================================ */
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  align-items: stretch;
+}
+
+.sidebar {
+  width: 236px;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #101c3a 0%, #16255c 55%, #1a2d6e 100%);
+  color: #cbd5f5;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  transition: width 0.18s ease;
+  box-shadow: 2px 0 12px rgba(15, 23, 42, 0.18);
+  z-index: 20;
+}
+.sidebar.collapsed { width: 68px; }
+
+/* ---- Brand ---- */
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+}
+.sidebar-logo {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  color: #fff;
+  font-weight: 800;
+  font-size: 17px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+.sidebar-brand-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.sidebar-brand-text strong { color: #fff; font-size: 14.5px; letter-spacing: -0.01em; }
+.sidebar-brand-text small { color: #93a5e8; font-size: 11px; }
+
+/* ---- Groups & links ---- */
+.sidebar-nav { flex: 1; padding: 10px 8px 12px; }
+.sidebar-group { margin-bottom: 14px; }
+.sidebar-group-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #7f93dd;
+  padding: 8px 10px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.sidebar.collapsed .sidebar-group-label { text-align: center; padding: 8px 2px 6px; }
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 10px;
+  margin: 2px 0;
+  border-radius: 9px;
+  color: #c3cdf0;
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.sidebar-link:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.sidebar-link.active {
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.35);
+}
+.sidebar.collapsed .sidebar-link { justify-content: center; padding: 10px 0; }
+
+.nav-icon { width: 19px; height: 19px; flex: 0 0 auto; }
+
+/* ---- Footer: user + actions ---- */
+.sidebar-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  padding: 12px 12px 14px;
+}
+.sidebar-user { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; min-width: 0; }
+.sidebar-user-name {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-user .role-chip { align-self: flex-start; }
+.sidebar-user .role-chip.role-site { background: rgba(147, 197, 253, 0.18); color: #bfdbfe; }
+.sidebar-user .role-chip.role-corporate { background: #fbbf24; color: #451a03; }
+
+.sidebar-actions { display: flex; gap: 8px; justify-content: space-between; }
+.sidebar.collapsed .sidebar-actions { flex-direction: column; align-items: center; }
+.sidebar-icon-btn {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  color: #cbd5f5 !important;
+  border-radius: 9px;
+  padding: 8px 0;
+  min-width: 40px;
+  cursor: pointer;
+}
+.sidebar-icon-btn:hover { background: rgba(255, 255, 255, 0.16) !important; color: #fff !important; }
+.sidebar-icon-btn .nav-icon { width: 17px; height: 17px; }
+
+/* ---- Content area ---- */
+.app-content {
+  flex: 1;
+  min-width: 0;
+  padding: 22px 26px 40px;
+  max-width: 1200px;
+}
+
+/* On small screens keep content padding tight */
+@media (max-width: 700px) {
+  .app-content { padding: 14px 12px 32px; }
+}
