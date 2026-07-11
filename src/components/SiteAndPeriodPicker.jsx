@@ -3,6 +3,7 @@
 
 import React from 'react'
 import { useAppContext } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
 import { formatPeriodLabel } from '../../constants'
 import { Spinner } from './Feedback'
 
@@ -17,6 +18,7 @@ export default function SiteAndPeriodPicker({ helpText }) {
     setSelectedPeriodId,
     selectedPeriod
   } = useAppContext()
+  const { user, isCorporate } = useAuth()
 
   if (loading) return <Spinner label="Loading sites and periods…" />
 
@@ -25,20 +27,30 @@ export default function SiteAndPeriodPicker({ helpText }) {
   return (
     <div className="card">
       <div className="row">
-        <label className="picker-label">
-          Site
-          <select
-            value={selectedSiteId ?? ''}
-            onChange={(e) => setSelectedSiteId(Number(e.target.value))}
-          >
-            {sites.length === 0 && <option value="">— no sites —</option>}
-            {sites.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} ({s.code})
-              </option>
-            ))}
-          </select>
-        </label>
+        {isCorporate ? (
+          <label className="picker-label">
+            Site
+            <select
+              value={selectedSiteId ?? ''}
+              onChange={(e) => setSelectedSiteId(Number(e.target.value))}
+            >
+              {sites.length === 0 && <option value="">— no sites —</option>}
+              {sites.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.code})
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          // Site users are locked to their own site — show it, don't offer a choice.
+          <div className="picker-label">
+            Site
+            <span className="site-chip" title="Your login is bound to this site">
+              {user?.siteName ? `${user.siteName} (${user.siteCode})` : '—'}
+            </span>
+          </div>
+        )}
 
         <label className="picker-label">
           Report Period
