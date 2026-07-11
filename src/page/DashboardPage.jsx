@@ -12,12 +12,15 @@ import {
   Line
 } from 'recharts'
 import { useAppContext } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
 import { getGlobalReport, getCostSavingTrend } from '../client'
+import SubmissionCard from '../components/SubmissionCard'
 import { formatPeriodLabel, INITIATIVE_TYPES, labelFor } from '../../constants'
 import { Spinner, ErrorBanner, EmptyState } from '../components/Feedback'
 import StatCard from '../components/StatCard'
 
 export default function DashboardPage() {
+  const { isCorporate } = useAuth()
   const { reportPeriods, selectedPeriodId, setSelectedPeriodId, loading: contextLoading } =
     useAppContext()
 
@@ -69,6 +72,9 @@ export default function DashboardPage() {
 
   return (
     <>
+      {/* Site users manage their monthly submission right from the dashboard. */}
+      {!isCorporate && <SubmissionCard />}
+
       <div className="card">
         <div className="row">
           <h2 style={{ margin: 0 }}>Monthly global report</h2>
