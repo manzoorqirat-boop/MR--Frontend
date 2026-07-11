@@ -816,3 +816,67 @@ textarea {
 @media (max-width: 700px) {
   .app-content { padding: 14px 12px 32px; }
 }
+
+/* ============================================================
+   Scorecard: merged Excel import strip + fast-fill entry
+   ============================================================ */
+.import-strip { padding: 0; overflow: hidden; }
+.import-strip-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8fafc !important;
+  color: #1e293b !important;
+  border: none !important;
+  padding: 12px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 0;
+}
+.import-strip-toggle:hover { background: #eef2ff !important; }
+.import-strip.open .import-strip-toggle { border-bottom: 1px solid #e5e7eb !important; }
+.import-strip-caret { color: #64748b; }
+.import-strip-body { padding: 14px 16px 16px; }
+.import-results { margin-top: 10px; font-size: 13.5px; color: #166534; }
+
+/* Fill progress in the metric sidebar */
+.scorecard-progress { padding: 4px 4px 12px; border-bottom: 1px solid #eef2f7; margin-bottom: 8px; }
+.scorecard-progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+.scorecard-progress-label strong { color: #1e293b; }
+.scorecard-progress-bar {
+  height: 7px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.scorecard-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  border-radius: 999px;
+  transition: width 0.25s ease;
+}
+
+/* Filled sheets get a subtle green tick edge in the list */
+.scorecard-nav-item.filled:not(.active) { box-shadow: inset 3px 0 0 #22c55e; }
+
+/* Unsaved-changes chip */
+.dirty-chip {
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+.scorecard-actions { align-items: center; }
