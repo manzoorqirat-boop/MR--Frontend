@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { getSites, getReportPeriods } from '../client'
+import { useAuth } from './AuthContext'
 
 const AppContext = createContext(null)
 
@@ -7,6 +8,7 @@ const SITE_STORAGE_KEY = 'qms.selectedSiteId'
 const PERIOD_STORAGE_KEY = 'qms.selectedPeriodId'
 
 export function AppProvider({ children }) {
+  const { user } = useAuth()
   const [sites, setSites] = useState([])
   const [reportPeriods, setReportPeriods] = useState([])
   const [loading, setLoading] = useState(true)
@@ -61,12 +63,18 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     loadAll()
-  }, [loadAll])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadAll, user?.id])
 
   // Once data has loaded, make sure the selection still points at something real;
   // otherwise default to the first site and the most recent (already-sorted) period.
+  // Site users are pinned to their own site regardless of any stored selection.
   useEffect(() => {
     if (loading) return
+    if (user?.role === 'SiteUser' && user.siteId && selectedSiteId !== user.siteId) {
+      setSelectedSiteId(user.siteId)
+      return
+    }
     if (sites.length > 0 && !sites.some((s) => s.id === selectedSiteId)) {
       setSelectedSiteId(sites[0].id)
     }
