@@ -36,6 +36,15 @@ export const REPORT_PERIOD_STATUSES = {
   Locked: 'Locked'
 }
 
+// Lifecycle of one site's monthly submission (mirrors SubmissionStatus enum):
+//  NotStarted -> Submitted -> Approved, or Submitted -> Returned -> Submitted...
+export const SUBMISSION_STATUSES = [
+  { value: 'NotStarted', label: 'Not started' },
+  { value: 'Submitted', label: 'Awaiting review' },
+  { value: 'Approved', label: 'Approved' },
+  { value: 'Returned', label: 'Returned for revision' }
+]
+
 export const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
