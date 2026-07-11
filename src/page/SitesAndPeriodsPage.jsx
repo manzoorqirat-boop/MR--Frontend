@@ -1,11 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useAppContext } from '../context/AppContext'
 import {
   createSite,
   createReportPeriod,
   lockReportPeriod,
-  getSiteSubmissions,
-  markSiteSubmitted
+  getUsers,
+  createUser,
+  toggleUserActive,
+  resetUserPassword
 } from '../client'
 import { formatPeriodLabel, MONTH_NAMES } from '../../constants'
 import StatusBadge from '../StatusBadge'
@@ -13,17 +15,10 @@ import { Spinner, ErrorBanner, EmptyState } from '../components/Feedback'
 
 const now = new Date()
 
+// Corporate-only admin: manage sites, report periods, and the site/corporate
+// logins. Submission review lives on the Corporate Review page.
 export default function SitesAndPeriodsPage() {
-  const {
-    sites,
-    reportPeriods,
-    loading,
-    selectedPeriodId,
-    setSelectedPeriodId,
-    selectedPeriod,
-    refreshSites,
-    refreshReportPeriods
-  } = useAppContext()
+  const { sites, reportPeriods, loading, refreshSites, refreshReportPeriods } = useAppContext()
 
   const [error, setError] = useState(null)
 
@@ -121,7 +116,9 @@ export default function SitesAndPeriodsPage() {
               {savingSite ? 'Adding…' : 'Add site'}
             </button>
           </div>
-          <p className="muted" style={{ marginBottom: 0 }}>Codes must be unique.</p>
+          <p className="muted" style={{ marginBottom: 0 }}>
+            Codes must be unique. After adding a site, create a login for it below so the site team can sign in.
+          </p>
         </div>
 
         {/* ---------------- Report periods ---------------- */}
@@ -172,156 +169,190 @@ export default function SitesAndPeriodsPage() {
           </div>
           <p className="muted" style={{ marginBottom: 0 }}>
             Creating an existing month/year just returns the existing period.
+            Review and approve submissions on the Corporate Review page.
           </p>
         </div>
       </div>
 
-      <SubmissionPanel
-        sites={sites}
-        reportPeriods={reportPeriods}
-        selectedPeriodId={selectedPeriodId}
-        setSelectedPeriodId={setSelectedPeriodId}
-        selectedPeriod={selectedPeriod}
-        onError={setError}
-      />
+      <UserManagementPanel sites={sites} onError={setError} />
     </>
   )
 }
 
-// ---- Submission tracking for a chosen period ----
-function SubmissionPanel({ sites, reportPeriods, selectedPeriodId, setSelectedPeriodId, selectedPeriod, onError }) {
-  const [submissions, setSubmissions] = useState([])
+// ---- Logins for sites and corporate reviewers ----
+function UserManagementPanel({ sites, onError }) {
+  const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(false)
-  const [submittedBy, setSubmittedBy] = useState('')
-  const [markSiteId, setMarkSiteId] = useState('')
-  const [marking, setMarking] = useState(false)
+
+  const [username, setUsername] = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [password, setPassword] = useState('')
+  const [role, setRole] = useState('SiteUser')
+  const [userSiteId, setUserSiteId] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [notice, setNotice] = useState(null)
 
   const load = useCallback(async () => {
-    if (!selectedPeriodId) return
     setLoading(true)
     try {
-      const data = await getSiteSubmissions(selectedPeriodId)
-      setSubmissions(data)
+      setUsers(await getUsers())
     } catch (err) {
       onError(err?.response?.data?.error || err.message)
     } finally {
       setLoading(false)
     }
-  }, [selectedPeriodId, onError])
+  }, [onError])
 
   useEffect(() => { load() }, [load])
 
-  useEffect(() => {
-    if (sites.length > 0 && !sites.some((s) => s.id === Number(markSiteId))) {
-      setMarkSiteId(String(sites[0].id))
-    }
-  }, [sites, markSiteId])
-
-  // Build a row per active site: submitted or not.
-  const rows = useMemo(() => {
-    const byId = new Map(submissions.map((s) => [s.siteId, s]))
-    return sites.map((site) => {
-      const sub = byId.get(site.id)
-      return {
-        siteId: site.id,
-        siteName: site.name,
-        isSubmitted: Boolean(sub?.isSubmitted),
-        submittedBy: sub?.submittedBy || null,
-        submittedAtUtc: sub?.submittedAtUtc || null
-      }
-    })
-  }, [sites, submissions])
-
-  const isLocked = selectedPeriod?.status === 'Locked'
-
-  async function handleMark() {
-    if (!markSiteId) return
-    setMarking(true)
+  async function handleCreate() {
     onError(null)
+    setNotice(null)
+    if (!username.trim() || !password) {
+      onError('Username and password are required for a new login.')
+      return
+    }
+    if (role === 'SiteUser' && !userSiteId) {
+      onError('Pick which site this login belongs to.')
+      return
+    }
+    setSaving(true)
     try {
-      await markSiteSubmitted({
-        siteId: Number(markSiteId),
-        reportPeriodId: selectedPeriodId,
-        submittedBy: submittedBy.trim()
+      const created = await createUser({
+        username: username.trim(),
+        displayName: displayName.trim() || username.trim(),
+        password,
+        role,
+        siteId: role === 'SiteUser' ? Number(userSiteId) : null
       })
-      setSubmittedBy('')
+      setNotice(`Login '${created.username}' created. Share the username and password with the ${role === 'SiteUser' ? 'site' : 'corporate'} team securely.`)
+      setUsername('')
+      setDisplayName('')
+      setPassword('')
       await load()
     } catch (err) {
       onError(err?.response?.data?.error || err.message)
     } finally {
-      setMarking(false)
+      setSaving(false)
+    }
+  }
+
+  async function handleToggleActive(u) {
+    const verb = u.isActive ? 'Deactivate' : 'Reactivate'
+    if (!window.confirm(`${verb} the login '${u.username}'?`)) return
+    onError(null)
+    try {
+      await toggleUserActive(u.id)
+      await load()
+    } catch (err) {
+      onError(err?.response?.data?.error || err.message)
+    }
+  }
+
+  async function handleResetPassword(u) {
+    const newPassword = window.prompt(`New password for '${u.username}' (min 8 characters):`)
+    if (!newPassword) return
+    onError(null)
+    try {
+      await resetUserPassword(u.id, newPassword)
+      setNotice(`Password for '${u.username}' has been reset.`)
+    } catch (err) {
+      onError(err?.response?.data?.error || err.message)
     }
   }
 
   return (
     <div className="card">
-      <div className="row">
-        <h2 style={{ margin: 0 }}>Submission status</h2>
-        <label className="picker-label">
-          Period
-          <select value={selectedPeriodId ?? ''} onChange={(e) => setSelectedPeriodId(Number(e.target.value))}>
-            {reportPeriods.length === 0 && <option value="">— no periods —</option>}
-            {reportPeriods.map((p) => (
-              <option key={p.id} value={p.id}>{formatPeriodLabel(p)}</option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <h2>User logins</h2>
+      <p className="muted">
+        Each site signs in with its own account and can only see and submit its own data.
+        Corporate accounts review submissions across all sites.
+      </p>
 
-      {!selectedPeriodId ? (
-        <EmptyState>Create a report period first.</EmptyState>
-      ) : loading ? (
-        <Spinner label="Loading submission status…" />
-      ) : sites.length === 0 ? (
-        <EmptyState>Add a site to track submissions.</EmptyState>
+      {notice && <div className="success-banner">{notice}</div>}
+
+      {loading ? (
+        <Spinner label="Loading users…" />
+      ) : users.length === 0 ? (
+        <EmptyState>No logins yet.</EmptyState>
       ) : (
         <table>
           <thead>
-            <tr><th>Site</th><th style={{ width: 120 }}>Submitted</th><th>By</th></tr>
+            <tr>
+              <th>Username</th>
+              <th>Name</th>
+              <th>Role</th>
+              <th>Site</th>
+              <th style={{ width: 110 }}>Status</th>
+              <th style={{ width: 230 }}>Actions</th>
+            </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.siteId}>
-                <td>{r.siteName}</td>
+            {users.map((u) => (
+              <tr key={u.id}>
+                <td>{u.username}</td>
+                <td>{u.displayName}</td>
                 <td>
-                  {r.isSubmitted
-                    ? <span className="status-badge status-Completed">Submitted</span>
-                    : <span className="status-badge status-NotStarted">Pending</span>}
+                  <span className={`role-chip ${u.role === 'Corporate' ? 'role-corporate' : 'role-site'}`}>
+                    {u.role === 'Corporate' ? 'Corporate' : 'Site user'}
+                  </span>
                 </td>
-                <td>{r.submittedBy || '—'}</td>
+                <td>{u.siteName ? `${u.siteName} (${u.siteCode})` : <span className="muted">All sites</span>}</td>
+                <td>
+                  {u.isActive
+                    ? <span className="status-badge status-Open">Active</span>
+                    : <span className="status-badge status-NotStarted">Inactive</span>}
+                </td>
+                <td>
+                  <div className="row" style={{ marginBottom: 0, gap: 6 }}>
+                    <button className="secondary" onClick={() => handleResetPassword(u)}>Reset password</button>
+                    <button className="secondary" onClick={() => handleToggleActive(u)}>
+                      {u.isActive ? 'Deactivate' : 'Reactivate'}
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
 
-      {selectedPeriodId && sites.length > 0 && (
-        <>
-          <h3 style={{ marginBottom: 8 }}>Mark a site as submitted</h3>
-          <div className="row">
-            <label className="picker-label">
-              Site
-              <select value={markSiteId} onChange={(e) => setMarkSiteId(e.target.value)}>
-                {sites.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
-                ))}
-              </select>
-            </label>
-            <label className="picker-label">
-              Submitted by
-              <input type="text" value={submittedBy} onChange={(e) => setSubmittedBy(e.target.value)} placeholder="Your name" />
-            </label>
-            <button disabled={marking} onClick={handleMark} style={{ alignSelf: 'flex-end' }}>
-              {marking ? 'Saving…' : 'Mark submitted'}
-            </button>
-          </div>
-          {isLocked && (
-            <p className="muted" style={{ marginBottom: 0 }}>
-              Note: this period is locked. Submission status can still be recorded, but no data rows can be edited.
-            </p>
-          )}
-        </>
-      )}
+      <h3 style={{ marginBottom: 8 }}>Create a login</h3>
+      <div className="row">
+        <label className="picker-label">
+          Role
+          <select value={role} onChange={(e) => setRole(e.target.value)}>
+            <option value="SiteUser">Site user</option>
+            <option value="Corporate">Corporate</option>
+          </select>
+        </label>
+        {role === 'SiteUser' && (
+          <label className="picker-label">
+            Site
+            <select value={userSiteId} onChange={(e) => setUserSiteId(e.target.value)}>
+              <option value="">— pick a site —</option>
+              {sites.map((s) => (
+                <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
+              ))}
+            </select>
+          </label>
+        )}
+        <label className="picker-label">
+          Username
+          <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="e.g. site.north" />
+        </label>
+        <label className="picker-label">
+          Display name
+          <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="e.g. Plant North QA" />
+        </label>
+        <label className="picker-label">
+          Password
+          <input type="text" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="min 8 characters" />
+        </label>
+        <button disabled={saving} onClick={handleCreate} style={{ alignSelf: 'flex-end' }}>
+          {saving ? 'Creating…' : 'Create login'}
+        </button>
+      </div>
     </div>
   )
 }
