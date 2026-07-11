@@ -12,7 +12,6 @@ import SitesAndPeriodsPage from './page/SitesAndPeriodsPage'
 import ExcelImportPage from './page/ExcellImportPage'
 import ScorecardEntryPage from './page/ScorecardEntryPage'
 import ScorecardAnalyticsPage from './page/ScorecardAnalyticsPage'
-import ScorecardImportPage from './page/ScorecardImportPage'
 import CorporateReviewPage from './page/CorporateReviewPage'
 import { Spinner } from './components/Feedback'
 
@@ -43,8 +42,7 @@ const icons = {
   review: <Icon><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 13l2 2 4-4" /></Icon>,
   admin: <Icon><circle cx="9" cy="8" r="3.2" /><path d="M3.5 20c.6-3 2.8-5 5.5-5s4.9 2 5.5 5" /><circle cx="17.5" cy="7" r="2.2" /><path d="M15.5 12.6c2.6.3 4.4 2 5 4.9" /></Icon>,
   scorecard: <Icon><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18" /><path d="M9 9v11" /><path d="M15 9v11" /></Icon>,
-  scAnalytics: <Icon><path d="M3 17l5-5 4 4 8-8" /><path d="M15 8h5v5" /></Icon>,
-  scImport: <Icon><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /><path d="M12 11v6" /><path d="M9.5 14.5L12 17l2.5-2.5" /></Icon>
+  scAnalytics: <Icon><path d="M3 17l5-5 4 4 8-8" /><path d="M15 8h5v5" /></Icon>
 }
 
 /* ---------------- Navigation model: two groups ---------------- */
@@ -69,8 +67,7 @@ const NAV_GROUPS = [
     label: 'MR Data',
     links: [
       { to: '/scorecard', label: 'Scorecard', icon: 'scorecard' },
-      { to: '/scorecard-analytics', label: 'Scorecard Analytics', icon: 'scAnalytics' },
-      { to: '/scorecard-import', label: 'Scorecard Import', icon: 'scImport' }
+      { to: '/scorecard-analytics', label: 'Scorecard Analytics', icon: 'scAnalytics' }
     ]
   }
 ]
@@ -175,7 +172,6 @@ function AuthenticatedApp() {
             <Route path="/cost-savings" element={<CostSavingsPage />} />
             <Route path="/scorecard" element={<ScorecardEntryPage />} />
             <Route path="/scorecard-analytics" element={<ScorecardAnalyticsPage />} />
-            <Route path="/scorecard-import" element={<ScorecardImportPage />} />
             <Route path="/excel-import" element={<ExcelImportPage />} />
             <Route
               path="/review"
@@ -187,6 +183,7 @@ function AuthenticatedApp() {
             />
             {/* Old bookmark support */}
             <Route path="/sites-periods" element={<Navigate to="/admin" replace />} />
+            <Route path="/scorecard-import" element={<Navigate to="/scorecard" replace />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </main>
