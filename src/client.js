@@ -10,6 +10,37 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' }
 })
 
+// ---- Auth token handling ----
+// The JWT is stored by AuthContext; every request carries it. A 401 anywhere
+// (expired/invalid token) broadcasts an event so AuthContext can log out cleanly.
+export const TOKEN_STORAGE_KEY = 'qms.authToken'
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem(TOKEN_STORAGE_KEY)
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 401 && !error.config?.url?.includes('/api/auth/login')) {
+      window.dispatchEvent(new Event('qms:unauthorized'))
+    }
+    return Promise.reject(error)
+  }
+)
+
+// ---- Auth ----
+export const login = (username, password) =>
+  api.post('/api/auth/login', { username, password }).then(r => r.data)
+export const getMe = () => api.get('/api/auth/me').then(r => r.data)
+export const getUsers = () => api.get('/api/auth/users').then(r => r.data)
+export const createUser = (payload) => api.post('/api/auth/users', payload).then(r => r.data)
+export const toggleUserActive = (id) => api.patch(`/api/auth/users/${id}/toggle-active`).then(r => r.data)
+export const resetUserPassword = (id, newPassword) =>
+  api.patch(`/api/auth/users/${id}/password`, { newPassword }).then(r => r.data)
+
 // ---- Sites ----
 export const getSites = () => api.get('/api/sites').then(r => r.data)
 export const createSite = (site) => api.post('/api/sites', site).then(r => r.data)
@@ -19,11 +50,18 @@ export const getReportPeriods = () => api.get('/api/report-periods').then(r => r
 export const createReportPeriod = (period) => api.post('/api/report-periods', period).then(r => r.data)
 export const lockReportPeriod = (id) => api.patch(`/api/report-periods/${id}/lock`).then(r => r.data)
 
-// ---- Site Submissions ----
+// ---- Site Submissions (submit -> corporate review workflow) ----
 export const getSiteSubmissions = (reportPeriodId) =>
   api.get('/api/site-submissions', { params: { reportPeriodId } }).then(r => r.data)
-export const markSiteSubmitted = (payload) =>
-  api.post('/api/site-submissions', payload).then(r => r.data)
+// Site submits its month to corporate: { siteId, reportPeriodId }
+export const submitToCorporate = (payload) =>
+  api.post('/api/site-submissions/submit', payload).then(r => r.data)
+// Corporate decision: decision = 'Approve' | 'Return', comments required on return
+export const reviewSubmission = (submissionId, decision, comments) =>
+  api.post(`/api/site-submissions/${submissionId}/review`, { decision, comments }).then(r => r.data)
+// Corporate review grid: every site's workflow state + data counts for a period
+export const getSubmissionOverview = (reportPeriodId) =>
+  api.get('/api/site-submissions/overview', { params: { reportPeriodId } }).then(r => r.data)
 
 // ---- Training (sheet 1) ----
 // ADDED: getTraining was missing — backend GET /api/training exists
