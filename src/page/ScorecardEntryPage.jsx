@@ -1,15 +1,19 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppContext } from '../context/AppContext'
 import {
-  getScorecardSchema, getScorecardRows, saveScorecardRows, getScorecardStatus
+  getScorecardSchema, getScorecardRows, saveScorecardRows, getScorecardStatus,
+  importScorecard, downloadScorecardTemplate
 } from '../client'
 import SiteAndPeriodPicker from '../components/SiteAndPeriodPicker'
 import { Spinner, ErrorBanner, EmptyState } from '../components/Feedback'
 import { computeRow } from '../scorecardSchema'
 
-// Dynamic data-entry for the 20-sheet Monthly Site Scorecard.
-// The form for each metric is generated from the schema: input columns become
-// editable cells, computed columns show a live read-only preview.
+// Dynamic data-entry for the 20-sheet Monthly Site Scorecard, with the Excel
+// import built in (no separate page). Designed for fast fill:
+//  - "Save & next" walks through every sheet without touching the sidebar
+//  - Enter in the last row adds a new row
+//  - fill progress + per-sheet counts in the sidebar
+//  - unsaved changes are guarded when switching sheets
 export default function ScorecardEntryPage() {
   const { selectedSiteId, selectedPeriodId, isPeriodLocked } = useAppContext()
 
@@ -23,10 +27,20 @@ export default function ScorecardEntryPage() {
   const [error, setError] = useState(null)
   const [savedNote, setSavedNote] = useState(null)
 
+  // Snapshot of the rows as loaded, to detect unsaved edits.
+  const loadedSnapshot = useRef('')
+  const isDirty = JSON.stringify(rows) !== loadedSnapshot.current
+
   const canQuery = Boolean(selectedSiteId && selectedPeriodId)
   const activeMetric = useMemo(
     () => schema.find((m) => m.key === activeKey) || null,
     [schema, activeKey]
+  )
+
+  // Ordered flat list of metric keys — powers "Save & next".
+  const orderedKeys = useMemo(
+    () => [...schema].sort((a, b) => a.order - b.order).map((m) => m.key),
+    [schema]
   )
 
   // ---- Load schema once ----
@@ -54,6 +68,11 @@ export default function ScorecardEntryPage() {
     return [...map.entries()]
   }, [schema])
 
+  const filledCount = useMemo(
+    () => schema.filter((m) => (statusCounts[m.key] || 0) > 0).length,
+    [schema, statusCounts]
+  )
+
   const refreshStatus = useCallback(async () => {
     if (!canQuery) return
     try {
@@ -74,13 +93,14 @@ export default function ScorecardEntryPage() {
       const data = await getScorecardRows(selectedSiteId, selectedPeriodId, activeKey)
       const metric = schema.find((m) => m.key === activeKey)
       const inputCols = metric ? metric.columns.filter((c) => c.type !== 'computed') : []
-      // Convert resolved rows back into editable cell maps (input columns only).
       const editable = data.map((r) => {
         const cells = {}
         for (const c of inputCols) cells[c.key] = r.cells?.[c.key] ?? ''
         return cells
       })
-      setRows(editable.length ? editable : [blankCells(inputCols)])
+      const next = editable.length ? editable : [blankCells(inputCols)]
+      setRows(next)
+      loadedSnapshot.current = JSON.stringify(next)
     } catch (err) {
       setError(err?.response?.data?.error || err.message)
     } finally {
@@ -114,23 +134,57 @@ export default function ScorecardEntryPage() {
     setRows((rs) => (rs.length === 1 ? [blankCells(inputCols)] : rs.filter((_, i) => i !== rowIdx)))
   }
 
-  async function handleSave() {
-    // Drop fully-blank rows.
+  // Switching sheets warns if there are unsaved edits (one click saved is one
+  // click, but silently losing typed data is far worse).
+  function switchMetric(key) {
+    if (key === activeKey) return
+    if (isDirty && !window.confirm('You have unsaved changes on this sheet. Discard them?')) return
+    setActiveKey(key)
+  }
+
+  // Enter in the last row of a multi-row sheet adds the next row — keeps hands
+  // on the keyboard for long lists.
+  function handleCellKeyDown(e, rowIdx) {
+    if (e.key === 'Enter' && activeMetric?.multiRow && rowIdx === rows.length - 1) {
+      e.preventDefault()
+      addRow()
+    }
+  }
+
+  async function saveRows() {
     const nonEmpty = rows.filter((r) => inputCols.some((c) => String(r[c.key] ?? '').trim() !== ''))
+    const payload = {
+      siteId: selectedSiteId,
+      reportPeriodId: selectedPeriodId,
+      metricKey: activeKey,
+      rows: nonEmpty.map((r, i) => ({ rowIndex: i, cells: r }))
+    }
+    const res = await saveScorecardRows(payload)
+    return res
+  }
+
+  async function handleSave(goNext = false) {
     setSaving(true)
     setError(null)
     setSavedNote(null)
     try {
-      const payload = {
-        siteId: selectedSiteId,
-        reportPeriodId: selectedPeriodId,
-        metricKey: activeKey,
-        rows: nonEmpty.map((r, i) => ({ rowIndex: i, cells: r }))
-      }
-      const res = await saveScorecardRows(payload)
-      setSavedNote(`Saved ${res.rowsSaved} row(s) for ${activeMetric?.title}.`)
-      await loadRows()
+      const res = await saveRows()
+      loadedSnapshot.current = JSON.stringify(rows) // saved -> not dirty
       await refreshStatus()
+      if (goNext) {
+        const idx = orderedKeys.indexOf(activeKey)
+        const nextKey = orderedKeys[idx + 1]
+        if (nextKey) {
+          setActiveKey(nextKey)
+          setSavedNote(null)
+        } else {
+          setSavedNote('That was the last sheet — the whole scorecard has been walked through. 🎉')
+          await loadRows()
+        }
+      } else {
+        setSavedNote(`Saved ${res.rowsSaved} row(s) for ${activeMetric?.title}.`)
+        await loadRows()
+      }
     } catch (err) {
       setError(err?.response?.data?.error || err.message)
     } finally {
@@ -138,11 +192,21 @@ export default function ScorecardEntryPage() {
     }
   }
 
+  const isLastSheet = activeKey === orderedKeys[orderedKeys.length - 1]
+
   if (loadingSchema) return <Spinner label="Loading scorecard definitions…" />
 
   return (
     <>
       <SiteAndPeriodPicker helpText="Monthly Site Scorecard — fill each QC/QA metric for this site and month. Grey columns are auto-calculated." />
+
+      {/* Excel import lives right here — no separate page, no extra clicks. */}
+      <ImportStrip
+        disabled={!canQuery || isPeriodLocked}
+        siteId={selectedSiteId}
+        reportPeriodId={selectedPeriodId}
+        onImported={async () => { await refreshStatus(); await loadRows() }}
+      />
 
       <ErrorBanner message={error} />
 
@@ -150,12 +214,25 @@ export default function ScorecardEntryPage() {
         <p className="warning-box">This report period is locked — editing is disabled.</p>
       )}
       {savedNote && (
-        <div className="warning-box" style={{ background: '#f0fdf4', borderColor: '#86efac' }}>{savedNote}</div>
+        <div className="success-banner">{savedNote}</div>
       )}
 
       <div className="scorecard-layout">
-        {/* ---- Metric sidebar ---- */}
+        {/* ---- Metric sidebar with fill progress ---- */}
         <aside className="scorecard-nav card">
+          <div className="scorecard-progress">
+            <div className="scorecard-progress-label">
+              <span>Sheets filled</span>
+              <strong>{filledCount} / {schema.length}</strong>
+            </div>
+            <div className="scorecard-progress-bar">
+              <div
+                className="scorecard-progress-fill"
+                style={{ width: schema.length ? `${(filledCount / schema.length) * 100}%` : 0 }}
+              />
+            </div>
+          </div>
+
           {grouped.map(([category, metrics]) => (
             <div key={category} className="scorecard-nav-group">
               <div className="scorecard-nav-cat">{category}</div>
@@ -164,8 +241,8 @@ export default function ScorecardEntryPage() {
                 return (
                   <button
                     key={m.key}
-                    className={`scorecard-nav-item${m.key === activeKey ? ' active' : ''}`}
-                    onClick={() => setActiveKey(m.key)}
+                    className={`scorecard-nav-item${m.key === activeKey ? ' active' : ''}${count > 0 ? ' filled' : ''}`}
+                    onClick={() => switchMetric(m.key)}
                     type="button"
                   >
                     <span>{m.title}</span>
@@ -190,9 +267,10 @@ export default function ScorecardEntryPage() {
                   <h2 style={{ margin: 0 }}>{activeMetric.title}</h2>
                   <p className="muted" style={{ margin: '2px 0 0' }}>
                     {activeMetric.category}
-                    {activeMetric.multiRow ? ' · multiple rows allowed' : ' · single row'}
+                    {activeMetric.multiRow ? ' · multiple rows allowed · press Enter in the last row to add another' : ' · single row'}
                   </p>
                 </div>
+                {isDirty && <span className="dirty-chip">Unsaved changes</span>}
               </div>
 
               {loadingRows ? (
@@ -228,6 +306,7 @@ export default function ScorecardEntryPage() {
                                   value={row[c.key] ?? ''}
                                   disabled={isPeriodLocked}
                                   onChange={(e) => updateCell(rowIdx, c.key, e.target.value)}
+                                  onKeyDown={(e) => handleCellKeyDown(e, rowIdx)}
                                   style={{ width: '100%' }}
                                 />
                               </td>
@@ -261,14 +340,27 @@ export default function ScorecardEntryPage() {
                 </div>
               )}
 
-              <div className="row" style={{ marginTop: 12 }}>
+              <div className="row scorecard-actions" style={{ marginTop: 12 }}>
                 {activeMetric.multiRow && (
                   <button className="secondary" disabled={isPeriodLocked} onClick={addRow} type="button">
                     + Add row
                   </button>
                 )}
-                <button disabled={isPeriodLocked || saving} onClick={handleSave} type="button">
-                  {saving ? 'Saving…' : `Save ${activeMetric.title}`}
+                <button
+                  className="secondary"
+                  disabled={isPeriodLocked || saving}
+                  onClick={() => handleSave(false)}
+                  type="button"
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+                <button
+                  disabled={isPeriodLocked || saving}
+                  onClick={() => handleSave(true)}
+                  type="button"
+                  title="Save this sheet and jump to the next one"
+                >
+                  {saving ? 'Saving…' : isLastSheet ? 'Save (last sheet)' : 'Save & next →'}
                 </button>
               </div>
             </>
@@ -276,5 +368,115 @@ export default function ScorecardEntryPage() {
         </section>
       </div>
     </>
+  )
+}
+
+/* ---- Compact Excel import, collapsed by default ---- */
+function ImportStrip({ disabled, siteId, reportPeriodId, onImported }) {
+  const [open, setOpen] = useState(false)
+  const [file, setFile] = useState(null)
+  const [importing, setImporting] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+  const [result, setResult] = useState(null)
+  const [error, setError] = useState(null)
+  const inputRef = useRef(null)
+
+  async function handleTemplate() {
+    setDownloading(true)
+    setError(null)
+    try {
+      const blob = await downloadScorecardTemplate()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'Monthly_Site_Scorecard_Template.xlsx'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  async function handleImport() {
+    if (!file) { setError('Choose a .xlsx file first.'); return }
+    if (!file.name.toLowerCase().endsWith('.xlsx')) { setError('Only .xlsx files are supported.'); return }
+    setImporting(true)
+    setError(null)
+    setResult(null)
+    try {
+      const data = await importScorecard(siteId, reportPeriodId, file)
+      setResult(data)
+      setFile(null)
+      if (inputRef.current) inputRef.current.value = ''
+      await onImported()
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message)
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  return (
+    <div className={`card import-strip${open ? ' open' : ''}`}>
+      <button
+        type="button"
+        className="import-strip-toggle"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+      >
+        <span className="import-strip-title">
+          ⇪ Prefer Excel? Fill the whole scorecard from a workbook
+        </span>
+        <span className="import-strip-caret">{open ? '▴' : '▾'}</span>
+      </button>
+
+      {open && (
+        <div className="import-strip-body">
+          <p className="muted" style={{ marginTop: 0 }}>
+            Download the blank template (one tab per metric — grey columns are auto-calculated,
+            leave them blank), fill it offline, then upload. Sheets are matched by tab name and
+            columns by header text. Existing data for a matched metric is replaced.
+          </p>
+          <div className="row" style={{ marginBottom: 0 }}>
+            <button className="secondary" onClick={handleTemplate} disabled={downloading} type="button">
+              {downloading ? 'Preparing…' : '⬇ Download blank template'}
+            </button>
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".xlsx"
+              onChange={(e) => { setFile(e.target.files?.[0] || null); setResult(null); setError(null) }}
+            />
+            <button onClick={handleImport} disabled={disabled || importing || !file} type="button">
+              {importing ? 'Importing…' : 'Import workbook'}
+            </button>
+          </div>
+
+          {error && <p className="error-text">{error}</p>}
+          {importing && <Spinner label="Parsing and saving the workbook…" />}
+
+          {result && (
+            <div className="import-results">
+              <strong>
+                Imported {result.sheets?.filter((s) => s.matched).length ?? 0} sheet(s)
+                {result.sheets ? ` · ${result.sheets.reduce((n, s) => n + (s.rowsAccepted || 0), 0)} rows` : ''}
+              </strong>
+              {result.warnings?.length > 0 && (
+                <div className="warning-box" style={{ marginTop: 8 }}>
+                  <strong>Warnings:</strong>
+                  <ul style={{ margin: '4px 0 0 18px' }}>
+                    {result.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
