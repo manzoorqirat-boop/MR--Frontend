@@ -197,7 +197,7 @@ export default function ScorecardEntryPage() {
   if (loadingSchema) return <Spinner label="Loading scorecard definitions…" />
 
   return (
-    <>
+    <div className="scorecard-page">
       <SiteAndPeriodPicker helpText="Monthly Site Scorecard — fill each QC/QA metric for this site and month. Grey columns are auto-calculated." />
 
       {/* Excel import lives right here — no separate page, no extra clicks. */}
@@ -367,7 +367,7 @@ export default function ScorecardEntryPage() {
           )}
         </section>
       </div>
-    </>
+    </div>
   )
 }
 
