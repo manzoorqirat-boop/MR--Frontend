@@ -1,5 +1,5 @@
-import React from 'react'
-import { BrowserRouter, NavLink, Route, Routes, Navigate, useLocation } from 'react-router-dom'
+import React, { useEffect, useState } from 'react'
+import { BrowserRouter, NavLink, Route, Routes, Navigate } from 'react-router-dom'
 import { AppProvider } from './context/AppContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import LoginPage from './page/LoginPage'
@@ -16,111 +16,132 @@ import ScorecardImportPage from './page/ScorecardImportPage'
 import CorporateReviewPage from './page/CorporateReviewPage'
 import { Spinner } from './components/Feedback'
 
-// Two top-level modules, each with its own set of sub-tabs.
-// QBX Data = the original report suite; MR Data = the Monthly Site Scorecard.
+/* ---------------- Icons (inline SVG, no dependencies) ---------------- */
+function Icon({ children }) {
+  return (
+    <svg
+      className="nav-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
+  )
+}
+const icons = {
+  dashboard: <Icon><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></Icon>,
+  analytics: <Icon><path d="M3 20h18" /><path d="M6 20v-7" /><path d="M11 20V6" /><path d="M16 20v-10" /><path d="M21 20V9" /></Icon>,
+  training: <Icon><path d="M22 9L12 4 2 9l10 5 10-5z" /><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5" /><path d="M22 9v6" /></Icon>,
+  initiatives: <Icon><path d="M9 18h6" /><path d="M10 21h4" /><path d="M12 3a6 6 0 0 0-4 10.5c.8.7 1.3 1.5 1.5 2.5h5c.2-1 .7-1.8 1.5-2.5A6 6 0 0 0 12 3z" /></Icon>,
+  costSavings: <Icon><circle cx="12" cy="12" r="9" /><path d="M14.8 9.2a3 3 0 0 0-2.8-1.7c-1.7 0-3 1-3 2.25S10.3 11.6 12 12s3 1 3 2.25-1.3 2.25-3 2.25a3 3 0 0 1-2.8-1.7" /><path d="M12 5.5v2M12 16.5v2" /></Icon>,
+  excelImport: <Icon><path d="M12 3v12" /><path d="M8 11l4 4 4-4" /><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></Icon>,
+  review: <Icon><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 13l2 2 4-4" /></Icon>,
+  admin: <Icon><circle cx="9" cy="8" r="3.2" /><path d="M3.5 20c.6-3 2.8-5 5.5-5s4.9 2 5.5 5" /><circle cx="17.5" cy="7" r="2.2" /><path d="M15.5 12.6c2.6.3 4.4 2 5 4.9" /></Icon>,
+  scorecard: <Icon><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18" /><path d="M9 9v11" /><path d="M15 9v11" /></Icon>,
+  scAnalytics: <Icon><path d="M3 17l5-5 4 4 8-8" /><path d="M15 8h5v5" /></Icon>,
+  scImport: <Icon><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /><path d="M12 11v6" /><path d="M9.5 14.5L12 17l2.5-2.5" /></Icon>
+}
+
+/* ---------------- Navigation model: two groups ---------------- */
 // Links flagged corporateOnly are hidden from site users and guarded at the route level.
-const MODULES = [
+const NAV_GROUPS = [
   {
     key: 'qbx',
     label: 'QBX Data',
-    hint: 'Reports, training, initiatives & cost savings',
     links: [
-      { to: '/dashboard', label: 'Dashboard' },
-      { to: '/analytics', label: 'Analytics' },
-      { to: '/training', label: 'Training' },
-      { to: '/initiatives', label: 'Initiatives' },
-      { to: '/cost-savings', label: 'Cost Savings' },
-      { to: '/excel-import', label: 'Excel Import' },
-      { to: '/review', label: 'Corporate Review', corporateOnly: true },
-      { to: '/admin', label: 'Admin', corporateOnly: true }
+      { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
+      { to: '/analytics', label: 'Analytics', icon: 'analytics' },
+      { to: '/training', label: 'Training', icon: 'training' },
+      { to: '/initiatives', label: 'Initiatives', icon: 'initiatives' },
+      { to: '/cost-savings', label: 'Cost Savings', icon: 'costSavings' },
+      { to: '/excel-import', label: 'Excel Import', icon: 'excelImport' },
+      { to: '/review', label: 'Corporate Review', icon: 'review', corporateOnly: true },
+      { to: '/admin', label: 'Admin', icon: 'admin', corporateOnly: true }
     ]
   },
   {
     key: 'mr',
     label: 'MR Data',
-    hint: 'Monthly Site Scorecard \u2014 entry, analytics & import',
     links: [
-      { to: '/scorecard', label: 'Scorecard' },
-      { to: '/scorecard-analytics', label: 'Scorecard Analytics' },
-      { to: '/scorecard-import', label: 'Scorecard Import' }
+      { to: '/scorecard', label: 'Scorecard', icon: 'scorecard' },
+      { to: '/scorecard-analytics', label: 'Scorecard Analytics', icon: 'scAnalytics' },
+      { to: '/scorecard-import', label: 'Scorecard Import', icon: 'scImport' }
     ]
   }
 ]
 
-// Which module owns the current route (so refresh / deep-link keeps the right module open).
-function moduleForPath(pathname) {
-  const inMr = MODULES[1].links.some((l) => pathname.startsWith(l.to))
-  return inMr ? 'mr' : 'qbx'
-}
-
-function visibleLinks(module, isCorporate) {
-  return module.links.filter((l) => !l.corporateOnly || isCorporate)
-}
-
-function Navigation() {
-  const location = useLocation()
-  const { isCorporate } = useAuth()
-  const activeModuleKey = moduleForPath(location.pathname)
-  const activeModule = MODULES.find((m) => m.key === activeModuleKey) || MODULES[0]
+/* ---------------- Sidebar ---------------- */
+function Sidebar({ collapsed, onToggle }) {
+  const { user, isCorporate, logout } = useAuth()
 
   return (
-    <div className="module-nav">
-      {/* ---- Module tiles ---- */}
-      <div className="module-tiles">
-        {MODULES.map((mod) => {
-          const isActive = mod.key === activeModuleKey
-          // Selecting a module jumps to its first tab.
+    <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
+      {/* Brand */}
+      <div className="sidebar-brand">
+        <span className="sidebar-logo" aria-hidden="true">Q</span>
+        {!collapsed && (
+          <span className="sidebar-brand-text">
+            <strong>QMS Portal</strong>
+            <small>Site Reporting</small>
+          </span>
+        )}
+      </div>
+
+      {/* Groups */}
+      <nav className="sidebar-nav">
+        {NAV_GROUPS.map((group) => {
+          const links = group.links.filter((l) => !l.corporateOnly || isCorporate)
+          if (links.length === 0) return null
           return (
-            <NavLink
-              key={mod.key}
-              to={visibleLinks(mod, isCorporate)[0].to}
-              className={`module-tile${isActive ? ' active' : ''}`}
-            >
-              <span className="module-tile-label">{mod.label}</span>
-              <span className="module-tile-hint">{mod.hint}</span>
-            </NavLink>
+            <div className="sidebar-group" key={group.key}>
+              <div className="sidebar-group-label">
+                {collapsed ? group.label.split(' ')[0] : group.label}
+              </div>
+              {links.map((link) => (
+                <NavLink
+                  key={link.to}
+                  to={link.to}
+                  title={collapsed ? link.label : undefined}
+                  className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+                >
+                  {icons[link.icon]}
+                  {!collapsed && <span className="sidebar-link-label">{link.label}</span>}
+                </NavLink>
+              ))}
+            </div>
           )
         })}
-      </div>
+      </nav>
 
-      {/* ---- Sub-tabs for the active module ---- */}
-      <div className="submodule-tabs">
-        {visibleLinks(activeModule, isCorporate).map((link) => (
-          <NavLink
-            key={link.to}
-            to={link.to}
-            className={({ isActive }) => `subtab${isActive ? ' active' : ''}`}
-          >
-            {link.label}
-          </NavLink>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// App header: brand + who is signed in (and for site users, which site they
-// are locked to) + sign out.
-function AppHeader() {
-  const { user, isCorporate, logout } = useAuth()
-  return (
-    <header className="app-header">
-      <div className="app-header-inner">
-        <div className="app-brand">
-          <span className="app-brand-logo" aria-hidden="true">QMS</span>
-          <span className="app-brand-name">Site Reporting Portal</span>
-        </div>
-        <div className="app-user">
-          <div className="app-user-info">
-            <span className="app-user-name">{user.displayName}</span>
+      {/* Signed-in user + actions */}
+      <div className="sidebar-footer">
+        {!collapsed && (
+          <div className="sidebar-user">
+            <span className="sidebar-user-name">{user.displayName}</span>
             <span className={`role-chip ${isCorporate ? 'role-corporate' : 'role-site'}`}>
               {isCorporate ? 'Corporate' : (user.siteName ? `${user.siteName} (${user.siteCode})` : 'Site user')}
             </span>
           </div>
-          <button className="secondary header-logout" onClick={logout}>Sign out</button>
+        )}
+        <div className="sidebar-actions">
+          <button
+            className="sidebar-icon-btn"
+            onClick={onToggle}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <Icon>{collapsed ? <path d="M9 6l6 6-6 6" /> : <path d="M15 6l-6 6 6 6" />}</Icon>
+          </button>
+          <button className="sidebar-icon-btn" onClick={logout} title="Sign out">
+            <Icon><path d="M9 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></Icon>
+          </button>
         </div>
       </div>
-    </header>
+    </aside>
   )
 }
 
@@ -131,35 +152,44 @@ function CorporateRoute({ children }) {
 }
 
 function AuthenticatedApp() {
+  // Auto-collapse on narrow screens; the user can still toggle manually.
+  const [collapsed, setCollapsed] = useState(() => window.innerWidth < 900)
+  useEffect(() => {
+    const onResize = () => { if (window.innerWidth < 900) setCollapsed(true) }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   return (
     <AppProvider>
-      <AppHeader />
-      <div className="app-shell">
-        <Navigation />
+      <div className="app-layout">
+        <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
 
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/analytics" element={<AnalyticsPage />} />
-          <Route path="/training" element={<TrainingPage />} />
-          <Route path="/initiatives" element={<InitiativesPage />} />
-          <Route path="/cost-savings" element={<CostSavingsPage />} />
-          <Route path="/scorecard" element={<ScorecardEntryPage />} />
-          <Route path="/scorecard-analytics" element={<ScorecardAnalyticsPage />} />
-          <Route path="/scorecard-import" element={<ScorecardImportPage />} />
-          <Route path="/excel-import" element={<ExcelImportPage />} />
-          <Route
-            path="/review"
-            element={<CorporateRoute><CorporateReviewPage /></CorporateRoute>}
-          />
-          <Route
-            path="/admin"
-            element={<CorporateRoute><SitesAndPeriodsPage /></CorporateRoute>}
-          />
-          {/* Old bookmark support */}
-          <Route path="/sites-periods" element={<Navigate to="/admin" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
+        <main className="app-content">
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
+            <Route path="/training" element={<TrainingPage />} />
+            <Route path="/initiatives" element={<InitiativesPage />} />
+            <Route path="/cost-savings" element={<CostSavingsPage />} />
+            <Route path="/scorecard" element={<ScorecardEntryPage />} />
+            <Route path="/scorecard-analytics" element={<ScorecardAnalyticsPage />} />
+            <Route path="/scorecard-import" element={<ScorecardImportPage />} />
+            <Route path="/excel-import" element={<ExcelImportPage />} />
+            <Route
+              path="/review"
+              element={<CorporateRoute><CorporateReviewPage /></CorporateRoute>}
+            />
+            <Route
+              path="/admin"
+              element={<CorporateRoute><SitesAndPeriodsPage /></CorporateRoute>}
+            />
+            {/* Old bookmark support */}
+            <Route path="/sites-periods" element={<Navigate to="/admin" replace />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </main>
       </div>
     </AppProvider>
   )
