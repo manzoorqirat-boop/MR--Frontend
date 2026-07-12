@@ -53,9 +53,7 @@ export default function ScorecardAnalyticsPage() {
         setSchema(data)
         if (data.length) {
           setMetricKey(data[0].key)
-          const firstComputed = data[0].columns.find((c) => c.type === 'computed')
-          const firstNumeric = data[0].columns.find((c) => c.type === 'number')
-          setColumnKey((firstComputed || firstNumeric)?.key || '')
+          setColumnKey(defaultColumn(data[0]))
         }
       })
       .catch((err) => setError(err?.response?.data?.error || err.message))
@@ -67,12 +65,11 @@ export default function ScorecardAnalyticsPage() {
     [activeMetric]
   )
 
-  // Reset column when metric changes if current column not present.
+  // When the metric changes, snap back to its standard calculated KPI.
   useEffect(() => {
     if (!activeMetric) return
     if (!valueCols.some((c) => c.key === columnKey)) {
-      const firstComputed = valueCols.find((c) => activeMetric.columns.find((x) => x.key === c.key)?.type === 'computed')
-      setColumnKey((firstComputed || valueCols[0])?.key || '')
+      setColumnKey(defaultColumn(activeMetric))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metricKey])
@@ -137,12 +134,19 @@ export default function ScorecardAnalyticsPage() {
             </select>
           </label>
 
-          <label className="picker-label">
-            Column
+          <label className="picker-label" title="Defaults to the sheet's calculated KPI. Pick a raw input to drill into the underlying numbers.">
+            Value to chart
             <select value={columnKey} onChange={(e) => setColumnKey(e.target.value)}>
-              {valueCols.map((c) => (
-                <option key={c.key} value={c.key}>{c.label}</option>
-              ))}
+              <optgroup label="Calculated (scorecard formula)">
+                {valueCols.filter((c) => c.type === 'computed').map((c) => (
+                  <option key={c.key} value={c.key}>{c.label}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Raw inputs">
+                {valueCols.filter((c) => c.type !== 'computed').map((c) => (
+                  <option key={c.key} value={c.key}>{c.label}</option>
+                ))}
+              </optgroup>
             </select>
           </label>
 
@@ -242,6 +246,15 @@ export default function ScorecardAnalyticsPage() {
       )}
     </>
   )
+}
+
+// The metric's standard KPI: the last calculated column (formulas build up to
+// the headline %), falling back to the first numeric input for formula-less sheets.
+function defaultColumn(metric) {
+  const computed = metric.columns.filter((c) => c.type === 'computed')
+  if (computed.length) return computed[computed.length - 1].key
+  const firstNumber = metric.columns.find((c) => c.type === 'number')
+  return firstNumber?.key || ''
 }
 
 // ---- Pivot raw points into recharts-friendly rows ----
