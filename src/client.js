@@ -121,8 +121,16 @@ export const getRangeAnalytics = ({ fromYear, fromMonth, toYear, toMonth, granul
 // ============================================================
 
 // ---- Schema (definitions for all 20 metric sheets) ----
+// The backend serializes column Type as PascalCase ("Number", "Computed");
+// the UI compares lowercase everywhere, so normalize once here.
+const normalizeSchema = (schema) =>
+  schema.map((m) => ({
+    ...m,
+    columns: m.columns.map((c) => ({ ...c, type: String(c.type || '').toLowerCase() }))
+  }))
+
 export const getScorecardSchema = () =>
-  api.get('/api/scorecard/schema').then(r => r.data)
+  api.get('/api/scorecard/schema').then(r => normalizeSchema(r.data))
 
 // ---- Data entry ----
 export const getScorecardRows = (siteId, reportPeriodId, metricKey) =>
