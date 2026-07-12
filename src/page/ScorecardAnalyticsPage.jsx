@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer
+  LineChart, Line, BarChart, Bar, ComposedChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ReferenceLine, ResponsiveContainer
 } from 'recharts'
 import { useAppContext } from '../context/AppContext'
 import { getScorecardSchema, getScorecardAnalytics } from '../client'
@@ -14,12 +14,6 @@ import { Spinner, ErrorBanner, EmptyState } from '../components/Feedback'
 //   • DEEP DIVE — one metric, any value, three views, data grid.
 //  Percent KPIs (labels containing %) are shown as % — 0.0037 renders 0.37%.
 // ============================================================================
-
-const VIEWS = [
-  { value: 'monthwise', label: 'Month-wise (per site)' },
-  { value: 'combined', label: 'Combined (all selected sites)' },
-  { value: 'comparison', label: 'Single-month site comparison' }
-]
 
 const COLORS = ['#2563eb', '#16a34a', '#db2777', '#d97706', '#7c3aed', '#0891b2',
   '#dc2626', '#4d7c0f', '#9333ea', '#0d9488', '#c026d3', '#ea580c']
@@ -36,9 +30,16 @@ function defaultColumn(metric) {
 const colLabelOf = (metric, colKey) =>
   metric?.columns.find((c) => c.key === colKey)?.label || colKey
 
-// Columns whose label mentions % hold ratios — display them ×100 with a % suffix.
+// Columns whose label mentions % are percentages. Formulas store ratios (0.0037)
+// but some sheets take the % typed directly (e.g. 98 for 98%), so decide per
+// series: if every value is ≤ 1.5 it's a ratio → ×100; otherwise leave as-is.
 const isPercentLabel = (label) => /%/.test(label || '')
-const toDisplay = (v, pct) => (v == null ? null : pct ? Math.round(v * 10000) / 100 : v)
+function percentScale(rawValues) {
+  const nums = rawValues.filter((v) => v != null && !Number.isNaN(v)).map(Math.abs)
+  if (!nums.length) return 100
+  return Math.max(...nums) <= 1.5 ? 100 : 1
+}
+const round2 = (v) => (v == null ? null : Math.round(v * 100) / 100)
 
 export default function ScorecardAnalyticsPage() {
   const { sites, reportPeriods } = useAppContext()
@@ -47,7 +48,7 @@ export default function ScorecardAnalyticsPage() {
   const [mode, setMode] = useState('overview')          // 'overview' | 'single'
   const [metricKey, setMetricKey] = useState('')
   const [columnKey, setColumnKey] = useState('')
-  const [view, setView] = useState('monthwise')
+  const [view, setView] = useState('trend')
   const [granularity, setGranularity] = useState('monthly')
   const [siteIds, setSiteIds] = useState([])            // empty = all
   const [error, setError] = useState(null)
@@ -226,13 +227,14 @@ function MiniChart({ metric, points, colorOffset, onOpen }) {
 
   const { chartData, seriesKeys, latest } = useMemo(() => {
     const filtered = points.filter((p) => p.columnKey === colKey)
+    const scale = pct ? percentScale(filtered.map((p) => p.value)) : 1
     const labels = [...new Set(filtered.map((p) => p.periodLabel))].sort()
     const siteNames = [...new Set(filtered.map((p) => p.siteName))].sort()
     const rows = labels.map((lbl) => {
       const row = { name: lbl }
       for (const sn of siteNames) {
         const pt = filtered.find((p) => p.periodLabel === lbl && p.siteName === sn)
-        row[sn] = pt ? toDisplay(pt.value, pct) : null
+        row[sn] = pt ? round2(pt.value * scale) : null
       }
       return row
     })
@@ -274,7 +276,7 @@ function MiniChart({ metric, points, colorOffset, onOpen }) {
               {seriesKeys.map((k, i) => (
                 <Line key={k} type="monotone" dataKey={k}
                   stroke={COLORS[(colorOffset + i) % COLORS.length]}
-                  strokeWidth={1.8} dot={false} connectNulls />
+                  strokeWidth={1.8} dot={{ r: 2.5 }} connectNulls />
               ))}
             </LineChart>
           </ResponsiveContainer>
@@ -285,12 +287,24 @@ function MiniChart({ metric, points, colorOffset, onOpen }) {
 }
 
 /* ======================================================================
-   DEEP DIVE — one metric, any value, three views + data grid
+   DEEP DIVE — Minitab-style analyses for one metric
    ====================================================================== */
+const ANALYSES = [
+  { value: 'trend', label: 'Trend — per site (run chart)' },
+  { value: 'combined', label: 'Trend — combined average' },
+  { value: 'barcompare', label: 'Bar — site comparison (one month)' },
+  { value: 'pareto', label: 'Pareto — sites (one month)' },
+  { value: 'control', label: 'Control chart (I-chart, ±3σ)' },
+  { value: 'histogram', label: 'Histogram — distribution' }
+]
+const needsMonth = (a) => a === 'barcompare' || a === 'pareto'
+
 function DeepDive({
   schema, metricKey, setMetricKey, columnKey, setColumnKey,
   view, setView, range, granularity, siteIds, onError
 }) {
+  const analysis = view
+  const setAnalysis = setView
   const [points, setPoints] = useState([])
   const [loading, setLoading] = useState(false)
   const [comparePeriodLabel, setComparePeriodLabel] = useState('')
@@ -337,13 +351,17 @@ function DeepDive({
 
   const colLabel = colLabelOf(activeMetric, columnKey)
   const pct = isPercentLabel(colLabel)
+  const unit = pct ? '%' : ''
 
-  const { chartData, seriesKeys, periodLabels } = useMemo(
-    () => pivot(points, columnKey, view, comparePeriodLabel, pct),
-    [points, columnKey, view, comparePeriodLabel, pct]
-  )
+  // ---- Scaled points: %-labelled ratios ×100, already-% values untouched ----
+  const scaled = useMemo(() => {
+    const filtered = points.filter((p) => p.columnKey === columnKey)
+    const scale = pct ? percentScale(filtered.map((p) => p.value)) : 1
+    return filtered.map((p) => ({ ...p, value: round2(p.value == null ? null : p.value * scale) }))
+  }, [points, columnKey, pct])
 
-  const fmt = (v) => (v == null ? '–' : `${v}${pct ? '%' : ''}`)
+  const periodLabels = useMemo(() => [...new Set(scaled.map((p) => p.periodLabel))].sort(), [scaled])
+  const fmt = (v) => (v == null ? '–' : `${v}${unit}`)
 
   return (
     <>
@@ -373,19 +391,17 @@ function DeepDive({
           </label>
 
           <label className="picker-label">
-            View
-            <select value={view} onChange={(e) => setView(e.target.value)}>
-              {VIEWS.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
+            Analysis
+            <select value={analysis} onChange={(e) => setAnalysis(e.target.value)}>
+              {ANALYSES.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
             </select>
           </label>
 
-          {view === 'comparison' && (
+          {needsMonth(analysis) && (
             <label className="picker-label">
               Month
               <select value={comparePeriodLabel} onChange={(e) => setComparePeriodLabel(e.target.value)}>
-                {[...new Set(points.map((p) => p.periodLabel))].sort().map((l) => (
-                  <option key={l} value={l}>{l}</option>
-                ))}
+                {periodLabels.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
             </label>
           )}
@@ -394,104 +410,232 @@ function DeepDive({
 
       <div className="card">
         <h3 style={{ marginTop: 0 }}>
-          {activeMetric?.title} — {colLabel}{pct ? ' (%)' : ''}
+          {activeMetric?.title} — {colLabel}
           <span className="muted" style={{ fontWeight: 400 }}>
-            {' '}({VIEWS.find((v) => v.value === view)?.label})
+            {' '}({ANALYSES.find((a) => a.value === analysis)?.label})
           </span>
         </h3>
 
         {loading ? (
           <Spinner label="Crunching the numbers…" />
-        ) : points.length === 0 ? (
+        ) : scaled.length === 0 ? (
           <EmptyState>No scorecard data for this selection yet.</EmptyState>
         ) : (
-          <div style={{ width: '100%', height: 420 }}>
-            <ResponsiveContainer>
-              {view === 'comparison' ? (
-                <BarChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 40 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" angle={-25} textAnchor="end" interval={0} height={70} />
-                  <YAxis tickFormatter={(v) => `${v}${pct ? '%' : ''}`} />
-                  <Tooltip formatter={(v) => [fmt(v), colLabel]} />
-                  <Bar dataKey="value" fill={COLORS[0]} name={colLabel} />
-                </BarChart>
-              ) : (
-                <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis tickFormatter={(v) => `${v}${pct ? '%' : ''}`} />
-                  <Tooltip formatter={(v, name) => [fmt(v), name]} />
-                  <Legend />
-                  {seriesKeys.map((k, i) => (
-                    <Line key={k} type="monotone" dataKey={k} stroke={COLORS[i % COLORS.length]}
-                      strokeWidth={2} dot={{ r: 3 }} connectNulls />
-                  ))}
-                </LineChart>
-              )}
-            </ResponsiveContainer>
-          </div>
+          <AnalysisChart
+            analysis={analysis}
+            scaled={scaled}
+            periodLabels={periodLabels}
+            comparePeriodLabel={comparePeriodLabel}
+            colLabel={colLabel}
+            unit={unit}
+            fmt={fmt}
+          />
         )}
       </div>
 
-      {points.length > 0 && (
-        <DataTable points={points} columnKey={columnKey} colLabel={colLabel} periodLabels={periodLabels} pct={pct} />
+      {scaled.length > 0 && (
+        <DataTable scaled={scaled} colLabel={colLabel} periodLabels={periodLabels} unit={unit} />
       )}
     </>
   )
 }
 
-// ---- Pivot raw points into recharts-friendly rows (values %-scaled here) ----
-function pivot(points, columnKey, view, comparePeriodLabel, pct) {
-  const filtered = points
-    .filter((p) => p.columnKey === columnKey)
-    .map((p) => ({ ...p, value: toDisplay(p.value, pct) }))
-  const periodLabels = [...new Set(filtered.map((p) => p.periodLabel))].sort()
+/* ---- The actual chart per analysis type ---- */
+function AnalysisChart({ analysis, scaled, periodLabels, comparePeriodLabel, colLabel, unit, fmt }) {
+  const siteNames = useMemo(() => [...new Set(scaled.map((p) => p.siteName))].sort(), [scaled])
 
-  if (view === 'comparison') {
-    const rows = filtered
-      .filter((p) => p.periodLabel === comparePeriodLabel)
-      .map((p) => ({ name: p.siteName, value: p.value }))
-      .sort((a, b) => (b.value ?? -Infinity) - (a.value ?? -Infinity))
-    return { chartData: rows, seriesKeys: ['value'], periodLabels }
-  }
-
-  if (view === 'combined') {
-    const byPeriod = new Map()
-    for (const p of filtered) {
-      if (!byPeriod.has(p.periodLabel)) byPeriod.set(p.periodLabel, [])
-      if (p.value != null) byPeriod.get(p.periodLabel).push(p.value)
-    }
-    const chartData = periodLabels.map((lbl) => {
-      const vals = byPeriod.get(lbl) || []
-      const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null
-      return { name: lbl, 'All sites': avg == null ? null : Math.round(avg * 100) / 100 }
-    })
-    return { chartData, seriesKeys: ['All sites'], periodLabels }
-  }
-
-  const siteNames = [...new Set(filtered.map((p) => p.siteName))].sort()
-  const chartData = periodLabels.map((lbl) => {
+  // per-site trend rows
+  const trendRows = useMemo(() => periodLabels.map((lbl) => {
     const row = { name: lbl }
     for (const sn of siteNames) {
-      const pt = filtered.find((p) => p.periodLabel === lbl && p.siteName === sn)
+      const pt = scaled.find((p) => p.periodLabel === lbl && p.siteName === sn)
       row[sn] = pt ? pt.value : null
     }
     return row
-  })
-  return { chartData, seriesKeys: siteNames, periodLabels }
+  }), [scaled, periodLabels, siteNames])
+
+  // combined average series
+  const combinedRows = useMemo(() => periodLabels.map((lbl) => {
+    const vals = scaled.filter((p) => p.periodLabel === lbl && p.value != null).map((p) => p.value)
+    return { name: lbl, value: vals.length ? round2(vals.reduce((a, b) => a + b, 0) / vals.length) : null }
+  }), [scaled, periodLabels])
+
+  const tick = (v) => `${v}${unit}`
+
+  if (analysis === 'trend') {
+    return (
+      <Chart420>
+        <LineChart data={trendRows} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="name" />
+          <YAxis tickFormatter={tick} />
+          <Tooltip formatter={(v, name) => [fmt(v), name]} />
+          <Legend />
+          {siteNames.map((k, i) => (
+            <Line key={k} type="monotone" dataKey={k} stroke={COLORS[i % COLORS.length]}
+              strokeWidth={2} dot={{ r: 3 }} connectNulls />
+          ))}
+        </LineChart>
+      </Chart420>
+    )
+  }
+
+  if (analysis === 'combined') {
+    return (
+      <Chart420>
+        <ComposedChart data={combinedRows} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="name" />
+          <YAxis tickFormatter={tick} />
+          <Tooltip formatter={(v) => [fmt(v), `Average ${colLabel}`]} />
+          <Area type="monotone" dataKey="value" fill="#dbeafe" stroke="none" />
+          <Line type="monotone" dataKey="value" stroke={COLORS[0]} strokeWidth={2.5} dot={{ r: 4 }} connectNulls />
+        </ComposedChart>
+      </Chart420>
+    )
+  }
+
+  if (analysis === 'barcompare' || analysis === 'pareto') {
+    const monthRows = scaled
+      .filter((p) => p.periodLabel === comparePeriodLabel && p.value != null)
+      .map((p) => ({ name: p.siteName, value: p.value }))
+      .sort((a, b) => b.value - a.value)
+
+    if (analysis === 'barcompare') {
+      return (
+        <Chart420>
+          <BarChart data={monthRows} margin={{ top: 10, right: 20, left: 0, bottom: 40 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" angle={-25} textAnchor="end" interval={0} height={70} />
+            <YAxis tickFormatter={tick} />
+            <Tooltip formatter={(v) => [fmt(v), colLabel]} />
+            <Bar dataKey="value" fill={COLORS[0]} name={colLabel} />
+          </BarChart>
+        </Chart420>
+      )
+    }
+
+    // Pareto: sorted bars + cumulative-% line on a second axis
+    const total = monthRows.reduce((a, r) => a + r.value, 0) || 1
+    let running = 0
+    const paretoRows = monthRows.map((r) => {
+      running += r.value
+      return { ...r, cumulative: round2((running / total) * 100) }
+    })
+    return (
+      <Chart420>
+        <ComposedChart data={paretoRows} margin={{ top: 10, right: 20, left: 0, bottom: 40 }}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="name" angle={-25} textAnchor="end" interval={0} height={70} />
+          <YAxis yAxisId="left" tickFormatter={tick} />
+          <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+          <Tooltip formatter={(v, name) => (name === 'Cumulative %' ? [`${v}%`, name] : [fmt(v), colLabel])} />
+          <Legend />
+          <Bar yAxisId="left" dataKey="value" fill={COLORS[0]} name={colLabel} />
+          <Line yAxisId="right" type="monotone" dataKey="cumulative" stroke={COLORS[3]}
+            strokeWidth={2.5} dot={{ r: 4 }} name="Cumulative %" />
+          <ReferenceLine yAxisId="right" y={80} stroke="#94a3b8" strokeDasharray="4 4"
+            label={{ value: '80%', position: 'right', fill: '#64748b', fontSize: 11 }} />
+        </ComposedChart>
+      </Chart420>
+    )
+  }
+
+  if (analysis === 'control') {
+    // I-chart on the combined average series: mean ±3σ, out-of-control points red.
+    const series = combinedRows.filter((r) => r.value != null)
+    const mean = series.length ? series.reduce((a, r) => a + r.value, 0) / series.length : 0
+    const sd = series.length > 1
+      ? Math.sqrt(series.reduce((a, r) => a + (r.value - mean) ** 2, 0) / (series.length - 1))
+      : 0
+    const ucl = round2(mean + 3 * sd)
+    const lcl = round2(Math.max(0, mean - 3 * sd))
+    const meanR = round2(mean)
+    const controlDot = (props) => {
+      const { cx, cy, payload } = props
+      if (payload.value == null) return null
+      const out = payload.value > ucl || payload.value < lcl
+      return <circle cx={cx} cy={cy} r={out ? 5.5 : 4} fill={out ? '#dc2626' : COLORS[0]}
+        stroke="#fff" strokeWidth={1.5} />
+    }
+    return (
+      <>
+        <Chart420>
+          <LineChart data={combinedRows} margin={{ top: 10, right: 60, left: 0, bottom: 10 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis tickFormatter={tick} domain={['auto', 'auto']} />
+            <Tooltip formatter={(v) => [fmt(v), `Average ${colLabel}`]} />
+            <ReferenceLine y={ucl} stroke="#dc2626" strokeDasharray="5 3"
+              label={{ value: `UCL ${ucl}${unit}`, position: 'right', fill: '#dc2626', fontSize: 11 }} />
+            <ReferenceLine y={meanR} stroke="#16a34a"
+              label={{ value: `x̄ ${meanR}${unit}`, position: 'right', fill: '#16a34a', fontSize: 11 }} />
+            <ReferenceLine y={lcl} stroke="#dc2626" strokeDasharray="5 3"
+              label={{ value: `LCL ${lcl}${unit}`, position: 'right', fill: '#dc2626', fontSize: 11 }} />
+            <Line type="monotone" dataKey="value" stroke={COLORS[0]} strokeWidth={2} dot={controlDot} connectNulls />
+          </LineChart>
+        </Chart420>
+        <p className="muted" style={{ marginBottom: 0 }}>
+          Individuals chart over the average of the selected sites. Limits are x̄ ± 3σ over
+          {' '}{series.length} period(s); red points fall outside the limits. Pick a single
+          site chip above to control-chart one site.
+        </p>
+      </>
+    )
+  }
+
+  if (analysis === 'histogram') {
+    const values = scaled.map((p) => p.value).filter((v) => v != null)
+    if (!values.length) return <EmptyState>No values to bin yet.</EmptyState>
+    const min = Math.min(...values)
+    const max = Math.max(...values)
+    const binCount = Math.min(12, Math.max(5, Math.ceil(Math.sqrt(values.length))))
+    const width = (max - min) / binCount || 1
+    const bins = Array.from({ length: binCount }, (_, i) => ({
+      name: `${round2(min + i * width)}–${round2(min + (i + 1) * width)}${unit}`,
+      count: 0
+    }))
+    for (const v of values) {
+      const i = Math.min(binCount - 1, Math.floor((v - min) / width))
+      bins[i].count++
+    }
+    return (
+      <>
+        <Chart420>
+          <BarChart data={bins} margin={{ top: 10, right: 20, left: 0, bottom: 50 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" angle={-30} textAnchor="end" interval={0} height={80} />
+            <YAxis allowDecimals={false} />
+            <Tooltip formatter={(v) => [v, 'Data points']} />
+            <Bar dataKey="count" fill={COLORS[4]} name="Data points" />
+          </BarChart>
+        </Chart420>
+        <p className="muted" style={{ marginBottom: 0 }}>
+          Distribution of every site-month value in range ({values.length} points, {binCount} bins).
+        </p>
+      </>
+    )
+  }
+
+  return null
+}
+
+function Chart420({ children }) {
+  return (
+    <div style={{ width: '100%', height: 420 }}>
+      <ResponsiveContainer>{children}</ResponsiveContainer>
+    </div>
+  )
 }
 
 // ---- Raw data table (site × period grid) ----
-function DataTable({ points, columnKey, colLabel, periodLabels, pct }) {
-  const filtered = points
-    .filter((p) => p.columnKey === columnKey)
-    .map((p) => ({ ...p, value: toDisplay(p.value, pct) }))
-  const siteNames = [...new Set(filtered.map((p) => p.siteName))].sort()
-  const lookup = new Map(filtered.map((p) => [`${p.siteName}__${p.periodLabel}`, p.value]))
+function DataTable({ scaled, colLabel, periodLabels, unit }) {
+  const siteNames = [...new Set(scaled.map((p) => p.siteName))].sort()
+  const lookup = new Map(scaled.map((p) => [`${p.siteName}__${p.periodLabel}`, p.value]))
 
   return (
     <div className="card">
-      <h3 style={{ marginTop: 0 }}>Data grid — {colLabel}{pct ? ' (%)' : ''}</h3>
+      <h3 style={{ marginTop: 0 }}>Data grid — {colLabel}</h3>
       <div className="scorecard-table-wrap">
         <table className="scorecard-table">
           <thead>
@@ -506,7 +650,7 @@ function DataTable({ points, columnKey, colLabel, periodLabels, pct }) {
                 <td><strong>{sn}</strong></td>
                 {periodLabels.map((l) => {
                   const v = lookup.get(`${sn}__${l}`)
-                  return <td key={l}>{v == null ? '–' : `${v}${pct ? '%' : ''}`}</td>
+                  return <td key={l}>{v == null ? '–' : `${v}${unit}`}</td>
                 })}
               </tr>
             ))}
