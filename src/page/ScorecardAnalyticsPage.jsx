@@ -6,13 +6,15 @@ import {
 import { useAppContext } from '../context/AppContext'
 import { getScorecardSchema, getScorecardAnalytics } from '../client'
 import { Spinner, ErrorBanner, EmptyState } from '../components/Feedback'
-import { MONTH_NAMES } from '../../constants'
 
-// Scorecard analytics: every combination the report needs —
-//   • Month-wise per site      (trend lines, x = month, one line per site)
-//   • Combined all sites       (one aggregated line/bar across the group)
-//   • Single-month comparison  (bar per site for one month)
-// plus metric + column + site selection and monthly/quarterly granularity.
+// ============================================================================
+//  Scorecard Analytics
+//   • OVERVIEW  — every metric's calculated KPI as a mini trend chart,
+//                 all on one page. Click any chart to deep-dive.
+//   • DEEP DIVE — one metric, any value, three views, data grid.
+//  Percent KPIs (labels containing %) are shown as % — 0.0037 renders 0.37%.
+// ============================================================================
+
 const VIEWS = [
   { value: 'monthwise', label: 'Month-wise (per site)' },
   { value: 'combined', label: 'Combined (all selected sites)' },
@@ -22,22 +24,34 @@ const VIEWS = [
 const COLORS = ['#2563eb', '#16a34a', '#db2777', '#d97706', '#7c3aed', '#0891b2',
   '#dc2626', '#4d7c0f', '#9333ea', '#0d9488', '#c026d3', '#ea580c']
 
+// The metric's standard KPI: the last calculated column (formulas build up to
+// the headline %), falling back to the first numeric input.
+function defaultColumn(metric) {
+  const computed = metric.columns.filter((c) => c.type === 'computed')
+  if (computed.length) return computed[computed.length - 1].key
+  const firstNumber = metric.columns.find((c) => c.type === 'number')
+  return firstNumber?.key || ''
+}
+
+const colLabelOf = (metric, colKey) =>
+  metric?.columns.find((c) => c.key === colKey)?.label || colKey
+
+// Columns whose label mentions % hold ratios — display them ×100 with a % suffix.
+const isPercentLabel = (label) => /%/.test(label || '')
+const toDisplay = (v, pct) => (v == null ? null : pct ? Math.round(v * 10000) / 100 : v)
+
 export default function ScorecardAnalyticsPage() {
   const { sites, reportPeriods } = useAppContext()
 
   const [schema, setSchema] = useState([])
+  const [mode, setMode] = useState('overview')          // 'overview' | 'single'
   const [metricKey, setMetricKey] = useState('')
   const [columnKey, setColumnKey] = useState('')
   const [view, setView] = useState('monthwise')
   const [granularity, setGranularity] = useState('monthly')
-  const [siteIds, setSiteIds] = useState([])           // empty = all
-  const [comparePeriodLabel, setComparePeriodLabel] = useState('')
-
-  const [points, setPoints] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [siteIds, setSiteIds] = useState([])            // empty = all
   const [error, setError] = useState(null)
 
-  // Derive a default date range from the available periods (oldest → newest).
   const range = useMemo(() => {
     if (!reportPeriods.length) return null
     const sorted = [...reportPeriods].sort((a, b) => (a.year - b.year) || (a.month - b.month))
@@ -46,7 +60,6 @@ export default function ScorecardAnalyticsPage() {
     return { fromYear: from.year, fromMonth: from.month, toYear: to.year, toMonth: to.month }
   }, [reportPeriods])
 
-  // ---- Load schema ----
   useEffect(() => {
     getScorecardSchema()
       .then((data) => {
@@ -58,6 +71,229 @@ export default function ScorecardAnalyticsPage() {
       })
       .catch((err) => setError(err?.response?.data?.error || err.message))
   }, [])
+
+  const ordered = useMemo(() => [...schema].sort((a, b) => a.order - b.order), [schema])
+
+  function toggleSite(id) {
+    setSiteIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
+  }
+
+  function openDeepDive(metric) {
+    setMetricKey(metric.key)
+    setColumnKey(defaultColumn(metric))
+    setMode('single')
+  }
+
+  return (
+    <>
+      <ErrorBanner message={error} />
+
+      {/* ================= Shared controls ================= */}
+      <div className="card">
+        <div className="row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
+          <h2 style={{ margin: 0 }}>Scorecard Analytics</h2>
+          <div className="mode-switch">
+            <button
+              type="button"
+              className={mode === 'overview' ? 'active' : ''}
+              onClick={() => setMode('overview')}
+            >
+              All metrics
+            </button>
+            <button
+              type="button"
+              className={mode === 'single' ? 'active' : ''}
+              onClick={() => setMode('single')}
+            >
+              Deep dive
+            </button>
+          </div>
+        </div>
+
+        <div className="scorecard-site-filter" style={{ marginTop: 4 }}>
+          <span className="muted" style={{ marginRight: 8 }}>Sites:</span>
+          <button
+            type="button"
+            className={`chip${siteIds.length === 0 ? ' chip-active' : ''}`}
+            onClick={() => setSiteIds([])}
+          >
+            All
+          </button>
+          {sites.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className={`chip${siteIds.includes(s.id) ? ' chip-active' : ''}`}
+              onClick={() => toggleSite(s.id)}
+            >
+              {s.name}
+            </button>
+          ))}
+          <span style={{ flex: 1 }} />
+          <label className="picker-label" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <span className="muted">Granularity</span>
+            <select value={granularity} onChange={(e) => setGranularity(e.target.value)}>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      {mode === 'overview' ? (
+        <OverviewGrid
+          metrics={ordered}
+          range={range}
+          granularity={granularity}
+          siteIds={siteIds}
+          onOpen={openDeepDive}
+        />
+      ) : (
+        <DeepDive
+          schema={ordered}
+          metricKey={metricKey}
+          setMetricKey={setMetricKey}
+          columnKey={columnKey}
+          setColumnKey={setColumnKey}
+          view={view}
+          setView={setView}
+          range={range}
+          granularity={granularity}
+          siteIds={siteIds}
+          onError={setError}
+        />
+      )}
+    </>
+  )
+}
+
+/* ======================================================================
+   OVERVIEW — all metrics on one page as mini trend charts
+   ====================================================================== */
+function OverviewGrid({ metrics, range, granularity, siteIds, onOpen }) {
+  const [byMetric, setByMetric] = useState({})   // key -> points[]
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!metrics.length || !range) return
+    let alive = true
+    setLoading(true)
+    Promise.all(
+      metrics.map((m) => {
+        const col = defaultColumn(m)
+        if (!col) return Promise.resolve([m.key, []])
+        return getScorecardAnalytics({
+          metricKey: m.key,
+          columnKey: col,
+          ...range,
+          granularity,
+          siteIds: siteIds.length ? siteIds : undefined
+        })
+          .then((pts) => [m.key, pts])
+          .catch(() => [m.key, []])
+      })
+    ).then((entries) => {
+      if (!alive) return
+      setByMetric(Object.fromEntries(entries))
+      setLoading(false)
+    })
+    return () => { alive = false }
+  }, [metrics, range, granularity, siteIds])
+
+  if (loading && Object.keys(byMetric).length === 0) {
+    return <Spinner label="Loading all metric trends…" />
+  }
+
+  return (
+    <div className="ana-grid">
+      {metrics.map((m, idx) => (
+        <MiniChart
+          key={m.key}
+          metric={m}
+          points={byMetric[m.key] || []}
+          colorOffset={idx}
+          onOpen={() => onOpen(m)}
+        />
+      ))}
+    </div>
+  )
+}
+
+function MiniChart({ metric, points, colorOffset, onOpen }) {
+  const colKey = defaultColumn(metric)
+  const colLabel = colLabelOf(metric, colKey)
+  const pct = isPercentLabel(colLabel)
+
+  const { chartData, seriesKeys, latest } = useMemo(() => {
+    const filtered = points.filter((p) => p.columnKey === colKey)
+    const labels = [...new Set(filtered.map((p) => p.periodLabel))].sort()
+    const siteNames = [...new Set(filtered.map((p) => p.siteName))].sort()
+    const rows = labels.map((lbl) => {
+      const row = { name: lbl }
+      for (const sn of siteNames) {
+        const pt = filtered.find((p) => p.periodLabel === lbl && p.siteName === sn)
+        row[sn] = pt ? toDisplay(pt.value, pct) : null
+      }
+      return row
+    })
+    // Latest overall value (avg across sites in the newest period) for the headline.
+    let latestVal = null
+    if (labels.length) {
+      const last = rows[rows.length - 1]
+      const vals = siteNames.map((sn) => last[sn]).filter((v) => v != null)
+      if (vals.length) latestVal = Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100
+    }
+    return { chartData: rows, seriesKeys: siteNames, latest: latestVal }
+  }, [points, colKey, pct])
+
+  const empty = chartData.length === 0
+
+  return (
+    <button type="button" className="ana-mini card" onClick={onOpen} title={`${metric.title} — open deep dive`}>
+      <div className="ana-mini-head">
+        <span className="ana-mini-title">{metric.title}</span>
+        <span className="ana-mini-latest">
+          {latest == null ? '—' : `${latest}${pct ? '%' : ''}`}
+        </span>
+      </div>
+      <span className="ana-mini-sub" title={colLabel}>{colLabel}</span>
+
+      <div className="ana-mini-chart">
+        {empty ? (
+          <span className="ana-mini-empty">No data yet</span>
+        ) : (
+          <ResponsiveContainer>
+            <LineChart data={chartData} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
+              <XAxis dataKey="name" hide />
+              <YAxis hide domain={['auto', 'auto']} />
+              <Tooltip
+                formatter={(v) => [`${v}${pct ? '%' : ''}`]}
+                labelStyle={{ fontSize: 11 }}
+                contentStyle={{ fontSize: 11, padding: '4px 8px' }}
+              />
+              {seriesKeys.map((k, i) => (
+                <Line key={k} type="monotone" dataKey={k}
+                  stroke={COLORS[(colorOffset + i) % COLORS.length]}
+                  strokeWidth={1.8} dot={false} connectNulls />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </button>
+  )
+}
+
+/* ======================================================================
+   DEEP DIVE — one metric, any value, three views + data grid
+   ====================================================================== */
+function DeepDive({
+  schema, metricKey, setMetricKey, columnKey, setColumnKey,
+  view, setView, range, granularity, siteIds, onError
+}) {
+  const [points, setPoints] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [comparePeriodLabel, setComparePeriodLabel] = useState('')
 
   const activeMetric = useMemo(() => schema.find((m) => m.key === metricKey) || null, [schema, metricKey])
   const valueCols = useMemo(
@@ -74,63 +310,49 @@ export default function ScorecardAnalyticsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metricKey])
 
-  // ---- Fetch analytics ----
-  async function run() {
-    if (!metricKey || !range) return
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await getScorecardAnalytics({
-        metricKey,
-        columnKey: columnKey || undefined,
-        ...range,
-        granularity,
-        siteIds: siteIds.length ? siteIds : undefined
-      })
-      setPoints(data)
-      // Default the comparison month to the newest period present in the data.
-      if (data.length) {
-        const newest = data.reduce((a, b) => (a.year * 100 + a.month >= b.year * 100 + b.month ? a : b))
-        setComparePeriodLabel(newest.periodLabel)
-      }
-    } catch (err) {
-      setError(err?.response?.data?.error || err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Auto-run when key selections change.
   useEffect(() => {
-    if (metricKey && columnKey && range) run()
+    if (!metricKey || !columnKey || !range) return
+    let alive = true
+    setLoading(true)
+    getScorecardAnalytics({
+      metricKey,
+      columnKey,
+      ...range,
+      granularity,
+      siteIds: siteIds.length ? siteIds : undefined
+    })
+      .then((data) => {
+        if (!alive) return
+        setPoints(data)
+        if (data.length) {
+          const newest = data.reduce((a, b) => (a.year * 100 + a.month >= b.year * 100 + b.month ? a : b))
+          setComparePeriodLabel(newest.periodLabel)
+        }
+      })
+      .catch((err) => onError(err?.response?.data?.error || err.message))
+      .finally(() => alive && setLoading(false))
+    return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [metricKey, columnKey, granularity, siteIds])
+  }, [metricKey, columnKey, granularity, siteIds, range])
 
-  function toggleSite(id) {
-    setSiteIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
-  }
+  const colLabel = colLabelOf(activeMetric, columnKey)
+  const pct = isPercentLabel(colLabel)
 
-  const colLabel = valueCols.find((c) => c.key === columnKey)?.label || columnKey
-
-  // ---- Pivot points into chart data per view ----
   const { chartData, seriesKeys, periodLabels } = useMemo(
-    () => pivot(points, columnKey, view, comparePeriodLabel),
-    [points, columnKey, view, comparePeriodLabel]
+    () => pivot(points, columnKey, view, comparePeriodLabel, pct),
+    [points, columnKey, view, comparePeriodLabel, pct]
   )
+
+  const fmt = (v) => (v == null ? '–' : `${v}${pct ? '%' : ''}`)
 
   return (
     <>
-      <ErrorBanner message={error} />
-
       <div className="card">
-        <h2 style={{ marginTop: 0 }}>Scorecard Analytics</h2>
         <div className="scorecard-analytics-controls">
           <label className="picker-label">
             Metric
             <select value={metricKey} onChange={(e) => setMetricKey(e.target.value)}>
-              {[...schema].sort((a, b) => a.order - b.order).map((m) => (
-                <option key={m.key} value={m.key}>{m.title}</option>
-              ))}
+              {schema.map((m) => <option key={m.key} value={m.key}>{m.title}</option>)}
             </select>
           </label>
 
@@ -157,14 +379,6 @@ export default function ScorecardAnalyticsPage() {
             </select>
           </label>
 
-          <label className="picker-label">
-            Granularity
-            <select value={granularity} onChange={(e) => setGranularity(e.target.value)}>
-              <option value="monthly">Monthly</option>
-              <option value="quarterly">Quarterly</option>
-            </select>
-          </label>
-
           {view === 'comparison' && (
             <label className="picker-label">
               Month
@@ -176,33 +390,11 @@ export default function ScorecardAnalyticsPage() {
             </label>
           )}
         </div>
-
-        {/* Site multi-select */}
-        <div className="scorecard-site-filter">
-          <span className="muted" style={{ marginRight: 8 }}>Sites:</span>
-          <button
-            type="button"
-            className={`chip${siteIds.length === 0 ? ' chip-active' : ''}`}
-            onClick={() => setSiteIds([])}
-          >
-            All
-          </button>
-          {sites.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              className={`chip${siteIds.includes(s.id) ? ' chip-active' : ''}`}
-              onClick={() => toggleSite(s.id)}
-            >
-              {s.name}
-            </button>
-          ))}
-        </div>
       </div>
 
       <div className="card">
         <h3 style={{ marginTop: 0 }}>
-          {activeMetric?.title} — {colLabel}
+          {activeMetric?.title} — {colLabel}{pct ? ' (%)' : ''}
           <span className="muted" style={{ fontWeight: 400 }}>
             {' '}({VIEWS.find((v) => v.value === view)?.label})
           </span>
@@ -219,16 +411,16 @@ export default function ScorecardAnalyticsPage() {
                 <BarChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" angle={-25} textAnchor="end" interval={0} height={70} />
-                  <YAxis />
-                  <Tooltip />
+                  <YAxis tickFormatter={(v) => `${v}${pct ? '%' : ''}`} />
+                  <Tooltip formatter={(v) => [fmt(v), colLabel]} />
                   <Bar dataKey="value" fill={COLORS[0]} name={colLabel} />
                 </BarChart>
               ) : (
                 <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
+                  <YAxis tickFormatter={(v) => `${v}${pct ? '%' : ''}`} />
+                  <Tooltip formatter={(v, name) => [fmt(v), name]} />
                   <Legend />
                   {seriesKeys.map((k, i) => (
                     <Line key={k} type="monotone" dataKey={k} stroke={COLORS[i % COLORS.length]}
@@ -242,24 +434,17 @@ export default function ScorecardAnalyticsPage() {
       </div>
 
       {points.length > 0 && (
-        <DataTable points={points} columnKey={columnKey} colLabel={colLabel} periodLabels={periodLabels} />
+        <DataTable points={points} columnKey={columnKey} colLabel={colLabel} periodLabels={periodLabels} pct={pct} />
       )}
     </>
   )
 }
 
-// The metric's standard KPI: the last calculated column (formulas build up to
-// the headline %), falling back to the first numeric input for formula-less sheets.
-function defaultColumn(metric) {
-  const computed = metric.columns.filter((c) => c.type === 'computed')
-  if (computed.length) return computed[computed.length - 1].key
-  const firstNumber = metric.columns.find((c) => c.type === 'number')
-  return firstNumber?.key || ''
-}
-
-// ---- Pivot raw points into recharts-friendly rows ----
-function pivot(points, columnKey, view, comparePeriodLabel) {
-  const filtered = points.filter((p) => p.columnKey === columnKey)
+// ---- Pivot raw points into recharts-friendly rows (values %-scaled here) ----
+function pivot(points, columnKey, view, comparePeriodLabel, pct) {
+  const filtered = points
+    .filter((p) => p.columnKey === columnKey)
+    .map((p) => ({ ...p, value: toDisplay(p.value, pct) }))
   const periodLabels = [...new Set(filtered.map((p) => p.periodLabel))].sort()
 
   if (view === 'comparison') {
@@ -271,7 +456,6 @@ function pivot(points, columnKey, view, comparePeriodLabel) {
   }
 
   if (view === 'combined') {
-    // Aggregate across selected sites per period (average of site values).
     const byPeriod = new Map()
     for (const p of filtered) {
       if (!byPeriod.has(p.periodLabel)) byPeriod.set(p.periodLabel, [])
@@ -280,12 +464,11 @@ function pivot(points, columnKey, view, comparePeriodLabel) {
     const chartData = periodLabels.map((lbl) => {
       const vals = byPeriod.get(lbl) || []
       const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null
-      return { name: lbl, 'All sites': avg == null ? null : Math.round(avg * 10000) / 10000 }
+      return { name: lbl, 'All sites': avg == null ? null : Math.round(avg * 100) / 100 }
     })
     return { chartData, seriesKeys: ['All sites'], periodLabels }
   }
 
-  // month-wise: one line per site
   const siteNames = [...new Set(filtered.map((p) => p.siteName))].sort()
   const chartData = periodLabels.map((lbl) => {
     const row = { name: lbl }
@@ -299,14 +482,16 @@ function pivot(points, columnKey, view, comparePeriodLabel) {
 }
 
 // ---- Raw data table (site × period grid) ----
-function DataTable({ points, columnKey, colLabel, periodLabels }) {
-  const filtered = points.filter((p) => p.columnKey === columnKey)
+function DataTable({ points, columnKey, colLabel, periodLabels, pct }) {
+  const filtered = points
+    .filter((p) => p.columnKey === columnKey)
+    .map((p) => ({ ...p, value: toDisplay(p.value, pct) }))
   const siteNames = [...new Set(filtered.map((p) => p.siteName))].sort()
   const lookup = new Map(filtered.map((p) => [`${p.siteName}__${p.periodLabel}`, p.value]))
 
   return (
     <div className="card">
-      <h3 style={{ marginTop: 0 }}>Data grid — {colLabel}</h3>
+      <h3 style={{ marginTop: 0 }}>Data grid — {colLabel}{pct ? ' (%)' : ''}</h3>
       <div className="scorecard-table-wrap">
         <table className="scorecard-table">
           <thead>
@@ -321,7 +506,7 @@ function DataTable({ points, columnKey, colLabel, periodLabels }) {
                 <td><strong>{sn}</strong></td>
                 {periodLabels.map((l) => {
                   const v = lookup.get(`${sn}__${l}`)
-                  return <td key={l}>{v == null ? '–' : v}</td>
+                  return <td key={l}>{v == null ? '–' : `${v}${pct ? '%' : ''}`}</td>
                 })}
               </tr>
             ))}
