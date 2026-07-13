@@ -6,6 +6,7 @@ import {
   importScorecard, downloadScorecardTemplate
 } from '../client'
 import { formatPeriodLabel } from '../../constants'
+import SubmissionBar from '../components/SubmissionBar'
 import { Spinner, EmptyState } from '../components/Feedback'
 import { computeRow } from '../scorecardSchema'
 
@@ -52,6 +53,7 @@ export default function ScorecardEntryPage() {
   const [notice, setNotice] = useState(null)
   const [editorKey, setEditorKey] = useState(null)      // multi-row popup editor
   const [showImport, setShowImport] = useState(false)
+  const [submissionStatus, setSubmissionStatus] = useState('NotStarted')
 
   const canQuery = Boolean(selectedSiteId && selectedPeriodId)
 
@@ -163,6 +165,8 @@ export default function ScorecardEntryPage() {
 
   const selectedPeriod = reportPeriods.find((p) => p.id === selectedPeriodId)
   const editorMetric = ordered.find((m) => m.key === editorKey) || null
+  const frozen = submissionStatus === 'Submitted' || submissionStatus === 'Approved'
+  const readOnly = isPeriodLocked || frozen
 
   return (
     <div className="sc-page">
@@ -194,7 +198,7 @@ export default function ScorecardEntryPage() {
           </button>
           <button
             type="button"
-            disabled={isPeriodLocked || savingAll || dirtyKeys.length === 0}
+            disabled={readOnly || savingAll || dirtyKeys.length === 0}
             onClick={handleSaveAll}
             title={dirtyKeys.length ? `Sheets with changes: ${dirtyKeys.length}` : 'No unsaved changes'}
           >
@@ -202,6 +206,18 @@ export default function ScorecardEntryPage() {
           </button>
         </div>
       </div>
+
+      {!isCorporate && (
+        <SubmissionBar
+          siteId={selectedSiteId}
+          reportPeriodId={selectedPeriodId}
+          period={selectedPeriod}
+          filledCount={filledCount}
+          totalCount={ordered.length}
+          isPeriodLocked={isPeriodLocked}
+          onStatusChange={setSubmissionStatus}
+        />
+      )}
 
       {(error || notice || isPeriodLocked) && (
         <div className="sc-msgbar">
@@ -225,7 +241,7 @@ export default function ScorecardEntryPage() {
               rows={dataByKey[m.key] ?? []}
               dirty={isDirty(m.key)}
               filled={hasData(m)}
-              locked={isPeriodLocked}
+              locked={readOnly}
               onCell={(rowIdx, colKey, v) => updateCell(m.key, rowIdx, colKey, v)}
               onOpenEditor={() => setEditorKey(m.key)}
             />
@@ -238,7 +254,7 @@ export default function ScorecardEntryPage() {
         <RowsEditorModal
           metric={editorMetric}
           rows={dataByKey[editorMetric.key] ?? []}
-          locked={isPeriodLocked}
+          locked={readOnly}
           dirty={isDirty(editorMetric.key)}
           onCell={(rowIdx, colKey, v) => updateCell(editorMetric.key, rowIdx, colKey, v)}
           onAddRow={() => addRow(editorMetric)}
@@ -257,7 +273,7 @@ export default function ScorecardEntryPage() {
         <ImportModal
           siteId={selectedSiteId}
           reportPeriodId={selectedPeriodId}
-          locked={isPeriodLocked}
+          locked={readOnly}
           onImported={loadAll}
           onClose={() => setShowImport(false)}
         />
