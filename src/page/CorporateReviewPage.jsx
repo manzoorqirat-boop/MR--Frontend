@@ -3,7 +3,9 @@ import { useAppContext } from '../context/AppContext'
 import {
   getSubmissionOverview,
   reviewSubmission,
-  lockReportPeriod
+  lockReportPeriod,
+  listChangeRequests,
+  decideChangeRequest
 } from '../client'
 import { formatPeriodLabel } from '../../constants'
 import { SubmissionStatusPill } from '../components/SubmissionCard'
@@ -252,6 +254,8 @@ export default function CorporateReviewPage() {
         </div>
       )}
 
+      <ChangeRequestQueue />
+
       {/* ---- Return-for-revision dialog ---- */}
       {returning && (
         <div className="modal-backdrop" onClick={() => setReturning(null)}>
@@ -290,5 +294,164 @@ function DataCount({ label, value }) {
     <span className={`data-count${value > 0 ? '' : ' data-count-zero'}`}>
       {value} {label}
     </span>
+  )
+}
+
+/* ============ Initiative change requests: corporate approval queue ============ */
+const CR_FIELD_LABELS = {
+  name: 'Name', department: 'Department', category: 'Category',
+  facilitatorName: 'Facilitator', departmentHead: 'Dept. head',
+  status: 'Status', remarks: 'Remarks'
+}
+
+function ChangeRequestQueue() {
+  const [pending, setPending] = React.useState([])
+  const [loading, setLoading] = React.useState(true)
+  const [busyId, setBusyId] = React.useState(null)
+  const [rejecting, setRejecting] = React.useState(null) // cr being rejected
+  const [rejectComments, setRejectComments] = React.useState('')
+  const [error, setError] = React.useState(null)
+
+  const load = React.useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      setPending(await listChangeRequests('Pending'))
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  React.useEffect(() => { load() }, [load])
+
+  async function approve(cr) {
+    const verb = cr.requestType === 'Delete' ? 'delete this initiative' : 'apply these changes'
+    if (!window.confirm(`Approve the request from ${cr.siteName} and ${verb}?`)) return
+    setBusyId(cr.id)
+    setError(null)
+    try {
+      await decideChangeRequest(cr.id, 'Approve', null)
+      await load()
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function reject() {
+    if (!rejectComments.trim()) { setError('Comments are required when rejecting.'); return }
+    setBusyId(rejecting.id)
+    setError(null)
+    try {
+      await decideChangeRequest(rejecting.id, 'Reject', rejectComments.trim())
+      setRejecting(null)
+      setRejectComments('')
+      await load()
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  function diffOf(cr) {
+    try {
+      const before = JSON.parse(cr.originalJson || '{}')
+      const after = JSON.parse(cr.proposedJson || '{}')
+      return Object.keys(CR_FIELD_LABELS)
+        .filter((k) => String(before[k] ?? '') !== String(after[k] ?? ''))
+        .map((k) => ({ label: CR_FIELD_LABELS[k], before: before[k] ?? '—', after: after[k] ?? '—' }))
+    } catch {
+      return []
+    }
+  }
+
+  return (
+    <div className="card">
+      <h3 style={{ marginTop: 0 }}>
+        Initiative change requests
+        {pending.length > 0 && <span className="cr-count-badge">{pending.length} pending</span>}
+      </h3>
+      <p className="muted" style={{ marginTop: -6 }}>
+        Corrections proposed by sites on months that are already submitted or approved.
+        Approving applies the change immediately; rejecting sends your comments back to the site.
+      </p>
+
+      {error && <div className="error-banner" role="alert">{error}</div>}
+      {loading ? (
+        <Spinner label="Loading change requests…" />
+      ) : pending.length === 0 ? (
+        <EmptyState>No pending change requests. 🎉</EmptyState>
+      ) : (
+        <div className="cr-queue">
+          {pending.map((cr) => {
+            const diff = diffOf(cr)
+            return (
+              <div key={cr.id} className={`cr-item${cr.requestType === 'Delete' ? ' cr-delete' : ''}`}>
+                <div className="cr-item-head">
+                  <div>
+                    <strong>{cr.initiativeName}</strong>
+                    <span className="muted"> · {cr.siteName} · {cr.periodLabel} · {cr.initiativeType}</span>
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      {cr.requestType === 'Delete' ? 'Deletion requested' : 'Update requested'} by {cr.requestedBy}
+                      {' '}on {new Date(cr.requestedAtUtc).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="row" style={{ marginBottom: 0, gap: 6 }}>
+                    <button type="button" disabled={busyId === cr.id} onClick={() => approve(cr)}>
+                      {cr.requestType === 'Delete' ? 'Approve deletion' : 'Approve & apply'}
+                    </button>
+                    <button type="button" className="secondary" disabled={busyId === cr.id}
+                      onClick={() => { setRejecting(cr); setRejectComments('') }}>
+                      Reject
+                    </button>
+                  </div>
+                </div>
+
+                <div className="cr-just"><strong>Justification:</strong> {cr.justification}</div>
+
+                {cr.requestType === 'Update' && diff.length > 0 && (
+                  <table className="cr-diff">
+                    <thead>
+                      <tr><th>Field</th><th>Current</th><th>Proposed</th></tr>
+                    </thead>
+                    <tbody>
+                      {diff.map((d) => (
+                        <tr key={d.label}>
+                          <td>{d.label}</td>
+                          <td className="cr-before">{String(d.before)}</td>
+                          <td className="cr-after">{String(d.after)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {rejecting && (
+        <div className="modal-backdrop" onClick={() => setRejecting(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ marginTop: 0 }}>Reject change request — {rejecting.initiativeName}</h3>
+            <p className="muted">The site will see these comments on the initiative.</p>
+            <textarea rows={3} autoFocus value={rejectComments}
+              onChange={(e) => setRejectComments(e.target.value)}
+              placeholder="e.g. Status change needs the completed validation report attached first." />
+            <div className="row" style={{ marginTop: 12, marginBottom: 0, justifyContent: 'flex-end' }}>
+              <button type="button" className="secondary" onClick={() => setRejecting(null)}>Cancel</button>
+              <button type="button" className="danger" disabled={busyId === rejecting.id} onClick={reject}>
+                {busyId === rejecting.id ? 'Rejecting…' : 'Reject request'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
