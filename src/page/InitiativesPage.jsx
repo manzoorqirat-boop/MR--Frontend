@@ -3,7 +3,8 @@ import { useAppContext } from '../context/AppContext'
 import {
   getInitiatives, saveInitiativesBulk, deleteInitiative, updateInitiative,
   getInitiativeAttachments, uploadInitiativeAttachment,
-  downloadInitiativeAttachment, deleteInitiativeAttachment
+  downloadInitiativeAttachment, deleteInitiativeAttachment,
+  getSiteSubmissions, createChangeRequest, getChangeRequestsFor
 } from '../client'
 import { INITIATIVE_TYPES, COMPLETION_STATUSES } from '../../constants'
 import SiteAndPeriodPicker from '../components/SiteAndPeriodPicker'
@@ -55,6 +56,8 @@ export default function InitiativesPage() {
   const [error, setError] = useState(null)
   const [notice, setNotice] = useState(null)
   const [attachFor, setAttachFor] = useState(null) // initiative row for popup
+  const [crFor, setCrFor] = useState(null)          // initiative row for change-request popup
+  const [submissionStatus, setSubmissionStatus] = useState('NotStarted')
 
   const typeMeta = useMemo(
     () => INITIATIVE_TYPES.find((t) => t.value === type) || INITIATIVE_TYPES[0],
@@ -85,6 +88,21 @@ export default function InitiativesPage() {
     setDraftRows([blankRow()])
     setNotice(null)
   }, [load])
+
+  // The month's workflow state decides the editing mode: open months are
+  // edited directly; Submitted/Approved months take change requests instead.
+  useEffect(() => {
+    if (!selectedSiteId || !selectedPeriodId) return
+    getSiteSubmissions(selectedPeriodId)
+      .then((subs) => {
+        const own = subs.find((x) => x.siteId === selectedSiteId)
+        setSubmissionStatus(own?.status ?? 'NotStarted')
+      })
+      .catch(() => setSubmissionStatus('NotStarted'))
+  }, [selectedSiteId, selectedPeriodId])
+
+  const frozen = submissionStatus === 'Submitted' || submissionStatus === 'Approved'
+  const readOnly = isPeriodLocked || frozen
 
   const isRowDirty = useCallback(
     (r) => JSON.stringify(edits[r.id]) !== JSON.stringify(editableOf(r)),
@@ -197,6 +215,13 @@ export default function InitiativesPage() {
       <ErrorBanner message={error} />
       {notice && <div className="success-banner">{notice}</div>}
       {isPeriodLocked && <p className="warning-box">This report period is locked — editing is disabled.</p>}
+      {frozen && !isPeriodLocked && (
+        <p className="warning-box">
+          This month is {submissionStatus === 'Approved' ? 'approved' : 'with corporate for review'} —
+          initiatives are frozen. Use <strong>Request change</strong> on a row to propose a correction;
+          it applies only after corporate approves it.
+        </p>
+      )}
 
       {/* ================= Saved initiatives: the living register ================= */}
       <div className="card">
@@ -229,19 +254,19 @@ export default function InitiativesPage() {
                   return (
                     <tr key={r.id} className={dirty ? 'row-dirty' : ''}>
                       <td className="muted">{r.serialNo}</td>
-                      <td><input value={e.name} disabled={isPeriodLocked} onChange={(ev) => setEdit(r.id, 'name', ev.target.value)} /></td>
-                      <td><input value={e.department} disabled={isPeriodLocked} onChange={(ev) => setEdit(r.id, 'department', ev.target.value)} /></td>
+                      <td><input value={e.name} disabled={readOnly} onChange={(ev) => setEdit(r.id, 'name', ev.target.value)} /></td>
+                      <td><input value={e.department} disabled={readOnly} onChange={(ev) => setEdit(r.id, 'department', ev.target.value)} /></td>
                       {showCategory && (
-                        <td><input value={e.category} disabled={isPeriodLocked} onChange={(ev) => setEdit(r.id, 'category', ev.target.value)} /></td>
+                        <td><input value={e.category} disabled={readOnly} onChange={(ev) => setEdit(r.id, 'category', ev.target.value)} /></td>
                       )}
-                      <td><input value={e.facilitatorName} disabled={isPeriodLocked} onChange={(ev) => setEdit(r.id, 'facilitatorName', ev.target.value)} /></td>
-                      <td><input value={e.departmentHead} disabled={isPeriodLocked} onChange={(ev) => setEdit(r.id, 'departmentHead', ev.target.value)} /></td>
+                      <td><input value={e.facilitatorName} disabled={readOnly} onChange={(ev) => setEdit(r.id, 'facilitatorName', ev.target.value)} /></td>
+                      <td><input value={e.departmentHead} disabled={readOnly} onChange={(ev) => setEdit(r.id, 'departmentHead', ev.target.value)} /></td>
                       <td>
-                        <select value={e.status} disabled={isPeriodLocked} onChange={(ev) => setEdit(r.id, 'status', ev.target.value)}>
+                        <select value={e.status} disabled={readOnly} onChange={(ev) => setEdit(r.id, 'status', ev.target.value)}>
                           {COMPLETION_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </select>
                       </td>
-                      <td><input value={e.remarks} disabled={isPeriodLocked} onChange={(ev) => setEdit(r.id, 'remarks', ev.target.value)} /></td>
+                      <td><input value={e.remarks} disabled={readOnly} onChange={(ev) => setEdit(r.id, 'remarks', ev.target.value)} /></td>
                       <td>
                         <div className="row-actions">
                           <button
@@ -252,15 +277,23 @@ export default function InitiativesPage() {
                           >
                             📎 {r.attachmentCount > 0 ? r.attachmentCount : ''}
                           </button>
-                          {dirty ? (
+                          {frozen && !isPeriodLocked ? (
+                            r.pendingCrCount > 0 ? (
+                              <span className="cr-pending-chip" title="A change request is awaiting corporate decision">CR pending</span>
+                            ) : (
+                              <button type="button" className="secondary" onClick={() => setCrFor(r)} title="Propose a change for corporate approval">
+                                Request change
+                              </button>
+                            )
+                          ) : dirty ? (
                             <>
-                              <button type="button" disabled={busy || isPeriodLocked} onClick={() => saveRow(r)}>
+                              <button type="button" disabled={busy || readOnly} onClick={() => saveRow(r)}>
                                 {busy ? '…' : 'Save'}
                               </button>
                               <button type="button" className="secondary" disabled={busy} onClick={() => undoRow(r)}>Undo</button>
                             </>
                           ) : (
-                            <button type="button" className="secondary" disabled={busy || isPeriodLocked} onClick={() => removeRow(r)} title="Delete initiative">
+                            <button type="button" className="secondary" disabled={busy || readOnly} onClick={() => removeRow(r)} title="Delete initiative">
                               ✕
                             </button>
                           )}
@@ -302,21 +335,21 @@ export default function InitiativesPage() {
             <tbody>
               {draftRows.map((r, i) => (
                 <tr key={i}>
-                  <td><input value={r.name} disabled={isPeriodLocked} onChange={(e) => updateDraft(i, 'name', e.target.value)} /></td>
-                  <td><input value={r.department} disabled={isPeriodLocked} onChange={(e) => updateDraft(i, 'department', e.target.value)} /></td>
+                  <td><input value={r.name} disabled={readOnly} onChange={(e) => updateDraft(i, 'name', e.target.value)} /></td>
+                  <td><input value={r.department} disabled={readOnly} onChange={(e) => updateDraft(i, 'department', e.target.value)} /></td>
                   {showCategory && (
-                    <td><input value={r.category} disabled={isPeriodLocked} onChange={(e) => updateDraft(i, 'category', e.target.value)} /></td>
+                    <td><input value={r.category} disabled={readOnly} onChange={(e) => updateDraft(i, 'category', e.target.value)} /></td>
                   )}
-                  <td><input value={r.facilitatorName} disabled={isPeriodLocked} onChange={(e) => updateDraft(i, 'facilitatorName', e.target.value)} /></td>
-                  <td><input value={r.departmentHead} disabled={isPeriodLocked} onChange={(e) => updateDraft(i, 'departmentHead', e.target.value)} /></td>
+                  <td><input value={r.facilitatorName} disabled={readOnly} onChange={(e) => updateDraft(i, 'facilitatorName', e.target.value)} /></td>
+                  <td><input value={r.departmentHead} disabled={readOnly} onChange={(e) => updateDraft(i, 'departmentHead', e.target.value)} /></td>
                   <td>
-                    <select value={r.status} disabled={isPeriodLocked} onChange={(e) => updateDraft(i, 'status', e.target.value)}>
+                    <select value={r.status} disabled={readOnly} onChange={(e) => updateDraft(i, 'status', e.target.value)}>
                       {COMPLETION_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                     </select>
                   </td>
-                  <td><input value={r.remarks} disabled={isPeriodLocked} onChange={(e) => updateDraft(i, 'remarks', e.target.value)} /></td>
+                  <td><input value={r.remarks} disabled={readOnly} onChange={(e) => updateDraft(i, 'remarks', e.target.value)} /></td>
                   <td>
-                    <button type="button" className="secondary" disabled={isPeriodLocked} onClick={() => removeDraft(i)} title="Remove row">✕</button>
+                    <button type="button" className="secondary" disabled={readOnly} onClick={() => removeDraft(i)} title="Remove row">✕</button>
                   </td>
                 </tr>
               ))}
@@ -324,13 +357,23 @@ export default function InitiativesPage() {
           </table>
         </div>
         <div className="row" style={{ marginTop: 10, marginBottom: 0 }}>
-          <button type="button" className="secondary" disabled={isPeriodLocked} onClick={addDraft}>+ Add row</button>
-          <button type="button" disabled={isPeriodLocked || saving} onClick={handleSaveNew}>
+          <button type="button" className="secondary" disabled={readOnly} onClick={addDraft}>+ Add row</button>
+          <button type="button" disabled={readOnly || saving} onClick={handleSaveNew}>
             {saving ? 'Saving…' : 'Save new initiatives'}
           </button>
           <span className="muted">Tip: attach evidence with 📎 after saving.</span>
         </div>
       </div>
+
+      {/* ================= Change request popup ================= */}
+      {crFor && (
+        <ChangeRequestModal
+          initiative={crFor}
+          showCategory={showCategory}
+          onDone={async () => { setCrFor(null); await load() }}
+          onClose={() => setCrFor(null)}
+        />
+      )}
 
       {/* ================= Attachments popup ================= */}
       {attachFor && (
@@ -467,6 +510,142 @@ function AttachmentsModal({ initiative, locked, onChanged, onClose }) {
 
         <div className="row" style={{ marginTop: 12, marginBottom: 0, justifyContent: 'flex-end' }}>
           <button type="button" className="secondary" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ==================== Change request popup (site side) ==================== */
+function ChangeRequestModal({ initiative, showCategory, onDone, onClose }) {
+  const [requestType, setRequestType] = useState('Update')
+  const [proposed, setProposed] = useState(editableOf(initiative))
+  const [justification, setJustification] = useState('')
+  const [history, setHistory] = useState([])
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    getChangeRequestsFor(initiative.id).then(setHistory).catch(() => setHistory([]))
+  }, [initiative.id])
+
+  const set = (field, value) => setProposed((p) => ({ ...p, [field]: value }))
+
+  async function handleSubmit() {
+    if (!justification.trim()) {
+      setError('A justification is required — corporate needs to know why the change is needed.')
+      return
+    }
+    if (requestType === 'Update' && (!proposed.name.trim() || !proposed.department.trim())) {
+      setError('Name and Department are required.')
+      return
+    }
+    setSubmitting(true)
+    setError(null)
+    try {
+      await createChangeRequest(initiative.id, {
+        requestType,
+        justification: justification.trim(),
+        proposed: requestType === 'Update'
+          ? {
+              name: proposed.name, department: proposed.department,
+              category: proposed.category || null,
+              facilitatorName: proposed.facilitatorName, departmentHead: proposed.departmentHead,
+              status: proposed.status, remarks: proposed.remarks || null
+            }
+          : null
+      })
+      await onDone()
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message)
+      setSubmitting(false)
+    }
+  }
+
+  const changed = (field) =>
+    requestType === 'Update' && String(proposed[field] ?? '') !== String(editableOf(initiative)[field] ?? '')
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-card" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+        <h3 style={{ marginTop: 0 }}>Change request — {initiative.name}</h3>
+        <p className="muted" style={{ marginTop: -6 }}>
+          This month is frozen, so the correction applies only after corporate approves it.
+        </p>
+
+        <div className="row" style={{ marginBottom: 12 }}>
+          <label className="cr-type-option">
+            <input type="radio" checked={requestType === 'Update'} onChange={() => setRequestType('Update')} />
+            Update fields
+          </label>
+          <label className="cr-type-option">
+            <input type="radio" checked={requestType === 'Delete'} onChange={() => setRequestType('Delete')} />
+            Delete this initiative
+          </label>
+        </div>
+
+        {requestType === 'Update' && (
+          <div className="cr-fields">
+            <label className="picker-label">Name *
+              <input className={changed('name') ? 'cr-changed' : ''} value={proposed.name} onChange={(e) => set('name', e.target.value)} />
+            </label>
+            <label className="picker-label">Department *
+              <input className={changed('department') ? 'cr-changed' : ''} value={proposed.department} onChange={(e) => set('department', e.target.value)} />
+            </label>
+            {showCategory && (
+              <label className="picker-label">Category
+                <input className={changed('category') ? 'cr-changed' : ''} value={proposed.category} onChange={(e) => set('category', e.target.value)} />
+              </label>
+            )}
+            <label className="picker-label">Facilitator
+              <input className={changed('facilitatorName') ? 'cr-changed' : ''} value={proposed.facilitatorName} onChange={(e) => set('facilitatorName', e.target.value)} />
+            </label>
+            <label className="picker-label">Dept. head
+              <input className={changed('departmentHead') ? 'cr-changed' : ''} value={proposed.departmentHead} onChange={(e) => set('departmentHead', e.target.value)} />
+            </label>
+            <label className="picker-label">Status
+              <select className={changed('status') ? 'cr-changed' : ''} value={proposed.status} onChange={(e) => set('status', e.target.value)}>
+                {COMPLETION_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </label>
+            <label className="picker-label" style={{ gridColumn: '1 / -1' }}>Remarks
+              <input className={changed('remarks') ? 'cr-changed' : ''} value={proposed.remarks} onChange={(e) => set('remarks', e.target.value)} />
+            </label>
+          </div>
+        )}
+
+        <label className="picker-label" style={{ marginTop: 10 }}>
+          Justification * (why is this change needed?)
+          <textarea
+            rows={3}
+            value={justification}
+            onChange={(e) => setJustification(e.target.value)}
+            placeholder={requestType === 'Delete'
+              ? 'e.g. Duplicate of initiative #4; entered twice by mistake.'
+              : 'e.g. Status was reported as Completed but validation finished only on 12-Aug.'}
+          />
+        </label>
+
+        {error && <p className="error-text">{error}</p>}
+
+        {history.length > 0 && (
+          <div className="cr-history">
+            <strong style={{ fontSize: 13 }}>Previous requests</strong>
+            {history.map((h) => (
+              <div key={h.id} className="cr-history-item">
+                <span className={`status-badge cr-badge-${h.status}`}>{h.status}</span>
+                <span>{h.requestType} · {h.requestedBy} · {new Date(h.requestedAtUtc).toLocaleDateString()}</span>
+                {h.decisionComments && <span className="muted">— “{h.decisionComments}”</span>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="row" style={{ marginTop: 14, marginBottom: 0, justifyContent: 'flex-end' }}>
+          <button type="button" className="secondary" onClick={onClose}>Cancel</button>
+          <button type="button" className={requestType === 'Delete' ? 'danger' : ''} disabled={submitting} onClick={handleSubmit}>
+            {submitting ? 'Submitting…' : requestType === 'Delete' ? 'Request deletion' : 'Submit change request'}
+          </button>
         </div>
       </div>
     </div>
