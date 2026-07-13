@@ -96,6 +96,15 @@ export const downloadInitiativeAttachment = (attachmentId) =>
     .then(r => r.data)
 export const deleteInitiativeAttachment = (attachmentId) =>
   api.delete(`/api/initiatives/attachments/${attachmentId}`)
+// Change requests: post-submission corrections with corporate approval
+export const createChangeRequest = (initiativeId, payload) =>
+  api.post(`/api/initiatives/${initiativeId}/change-requests`, payload).then(r => r.data)
+export const getChangeRequestsFor = (initiativeId) =>
+  api.get(`/api/initiatives/${initiativeId}/change-requests`).then(r => r.data)
+export const listChangeRequests = (status = 'Pending') =>
+  api.get('/api/initiatives/change-requests', { params: { status } }).then(r => r.data)
+export const decideChangeRequest = (crId, decision, comments) =>
+  api.post(`/api/initiatives/change-requests/${crId}/decide`, { decision, comments }).then(r => r.data)
 
 // ---- Cost Savings (sheet 7) ----
 // ADDED: getCostSavings was missing — backend GET /api/cost-savings exists
