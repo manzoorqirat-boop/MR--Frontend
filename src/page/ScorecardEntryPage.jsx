@@ -242,7 +242,6 @@ export default function ScorecardEntryPage() {
               dirty={isDirty(m.key)}
               filled={hasData(m)}
               locked={readOnly}
-              onCell={(rowIdx, colKey, v) => updateCell(m.key, rowIdx, colKey, v)}
               onOpenEditor={() => setEditorKey(m.key)}
             />
           ))}
@@ -283,13 +282,14 @@ export default function ScorecardEntryPage() {
 }
 
 /* ============================ One metric card ============================ */
-function MetricCard({ metric, rows, dirty, filled, locked, onCell, onOpenEditor }) {
+function MetricCard({ metric, rows, dirty, filled, locked, onOpenEditor }) {
   const color = CATEGORY_COLORS[metric.category] || '#64748b'
   const inputCols = inputColsOf(metric)
   const computedCols = computedColsOf(metric)
   const row0 = rows[0] ?? {}
   const computed = computeRow(metric, row0)
   const rowCount = rows.filter((r) => inputCols.some((c) => String(r[c.key] ?? '').trim() !== '')).length
+  const filledFields = inputCols.filter((c) => String(row0[c.key] ?? '').trim() !== '').length
 
   return (
     <div className={`sc-card${dirty ? ' dirty' : ''}${filled ? ' filled' : ''}`} style={{ '--cat': color }}>
@@ -299,30 +299,21 @@ function MetricCard({ metric, rows, dirty, filled, locked, onCell, onOpenEditor 
         {!dirty && filled && <span className="sc-dot-ok" title="Has data" />}
       </div>
 
-      {metric.multiRow ? (
-        /* ---- Multi-row sheets: summary + popup editor ---- */
-        <button type="button" className="sc-card-rows" onClick={onOpenEditor}>
-          <span className="sc-rows-count">{rowCount}</span>
-          <span className="sc-rows-label">row{rowCount === 1 ? '' : 's'} · {inputCols.length} cols</span>
-          <span className="sc-rows-open">{locked ? 'View table →' : 'Edit table →'}</span>
-        </button>
-      ) : (
-        /* ---- Single-row sheets: edit right here ---- */
-        <div className="sc-fields">
-          {inputCols.map((c) => (
-            <label key={c.key} className="sc-field" title={c.label}>
-              <span className="sc-field-label">{c.label}</span>
-              <input
-                type={c.type === 'number' ? 'number' : c.type === 'date' ? 'date' : 'text'}
-                step="any"
-                value={row0[c.key] ?? ''}
-                disabled={locked}
-                onChange={(e) => onCell(0, c.key, e.target.value)}
-              />
-            </label>
-          ))}
-        </div>
-      )}
+      {/* Every sheet — single- or multi-row — opens the same popup table editor. */}
+      <button type="button" className="sc-card-rows" onClick={onOpenEditor}>
+        {metric.multiRow ? (
+          <>
+            <span className="sc-rows-count">{rowCount}</span>
+            <span className="sc-rows-label">row{rowCount === 1 ? '' : 's'} · {inputCols.length} cols</span>
+          </>
+        ) : (
+          <>
+            <span className="sc-rows-count">{filledFields}<span className="sc-rows-of">/{inputCols.length}</span></span>
+            <span className="sc-rows-label">fields filled</span>
+          </>
+        )}
+        <span className="sc-rows-open">{locked ? 'View table →' : 'Edit table →'}</span>
+      </button>
 
       {computedCols.length > 0 && (
         <div className="sc-computed">
@@ -370,7 +361,7 @@ function RowsEditorModal({ metric, rows, locked, dirty, onCell, onAddRow, onRemo
   }
 
   function onKeyDown(e, rowIdx) {
-    if (e.key === 'Enter' && rowIdx === rows.length - 1) { e.preventDefault(); onAddRow() }
+    if (e.key === 'Enter' && metric.multiRow && rowIdx === rows.length - 1) { e.preventDefault(); onAddRow() }
   }
 
   return (
@@ -380,7 +371,8 @@ function RowsEditorModal({ metric, rows, locked, dirty, onCell, onAddRow, onRemo
           <div>
             <h3 style={{ margin: 0 }}>{metric.title}</h3>
             <span className="muted" style={{ fontSize: 12.5 }}>
-              {metric.category} · press Enter in the last row to add another
+              {metric.category}
+              {metric.multiRow ? ' · press Enter in the last row to add another' : ' · single-row sheet'}
             </span>
           </div>
           <button className="secondary" type="button" onClick={handleClose}>✕</button>
@@ -422,7 +414,9 @@ function RowsEditorModal({ metric, rows, locked, dirty, onCell, onAddRow, onRemo
                       return <td key={c.key} className="computed-cell">{v === null || v === undefined ? '–' : v}</td>
                     })}
                     <td>
-                      <button className="secondary" disabled={locked} onClick={() => onRemoveRow(rowIdx)} title="Remove row" type="button">✕</button>
+                      {metric.multiRow && (
+                        <button className="secondary" disabled={locked} onClick={() => onRemoveRow(rowIdx)} title="Remove row" type="button">✕</button>
+                      )}
                     </td>
                   </tr>
                 )
@@ -434,7 +428,9 @@ function RowsEditorModal({ metric, rows, locked, dirty, onCell, onAddRow, onRemo
         {error && <p className="error-text">{error}</p>}
 
         <div className="sc-editor-foot">
-          <button className="secondary" disabled={locked} onClick={onAddRow} type="button">+ Add row</button>
+          {metric.multiRow ? (
+            <button className="secondary" disabled={locked} onClick={onAddRow} type="button">+ Add row</button>
+          ) : <span />}
           <div className="row" style={{ marginBottom: 0, gap: 8 }}>
             <button className="secondary" onClick={handleClose} type="button">Close</button>
             <button disabled={locked || saving} onClick={() => handleSave(true)} type="button">
