@@ -78,6 +78,24 @@ export const getInitiatives = (siteId, reportPeriodId, type) =>
 export const saveInitiativesBulk = (payload) =>
   api.post('/api/initiatives/bulk', payload).then(r => r.data)
 export const deleteInitiative = (id) => api.delete(`/api/initiatives/${id}`)
+// Workflow: update a saved initiative (status progress, corrections)
+export const updateInitiative = (id, payload) =>
+  api.put(`/api/initiatives/${id}`, payload).then(r => r.data)
+// Attachments (evidence files) per initiative
+export const getInitiativeAttachments = (id) =>
+  api.get(`/api/initiatives/${id}/attachments`).then(r => r.data)
+export const uploadInitiativeAttachment = (id, file) => {
+  const form = new FormData()
+  form.append('file', file)
+  return api.post(`/api/initiatives/${id}/attachments`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }).then(r => r.data)
+}
+export const downloadInitiativeAttachment = (attachmentId) =>
+  api.get(`/api/initiatives/attachments/${attachmentId}/download`, { responseType: 'blob' })
+    .then(r => r.data)
+export const deleteInitiativeAttachment = (attachmentId) =>
+  api.delete(`/api/initiatives/attachments/${attachmentId}`)
 
 // ---- Cost Savings (sheet 7) ----
 // ADDED: getCostSavings was missing — backend GET /api/cost-savings exists
