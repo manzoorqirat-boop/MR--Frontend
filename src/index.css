@@ -1236,3 +1236,6 @@ textarea {
 .sub-bar-text { flex: 1; min-width: 220px; color: #334155; }
 .sub-bar-error { color: #b91c1c; font-size: 12.5px; }
 .sub-bar-btn { white-space: nowrap; }
+
+/* Uniform edit-table cards: denominator styling on single-row field counts */
+.sc-rows-of { font-size: 13px; font-weight: 600; color: #94a3b8; }
