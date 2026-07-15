@@ -109,3 +109,37 @@ export const getScorecardAnalytics = (query) =>
   api.post('/api/scorecard/analytics', query).then(r => r.data)
 
 export default api
+
+// ---- QA-IT Compliance: periodic review register (per site per year) ----
+export const getQaItRegister = (siteId, year) =>
+  api.get('/api/qa-it/periodic-reviews', { params: { siteId, year } }).then(r => r.data)
+export const saveQaItRegister = (payload) =>
+  api.post('/api/qa-it/periodic-reviews/save', payload).then(r => r.data)
+
+// ---- Master data (equipment per site + controlled lists) ----
+export const getEquipmentMaster = (siteId, includeInactive = false) =>
+  api.get('/api/master/equipment', { params: { siteId, includeInactive } }).then(r => r.data)
+export const createEquipment = (payload) =>
+  api.post('/api/master/equipment', payload).then(r => r.data)
+export const toggleEquipment = (id) =>
+  api.patch(`/api/master/equipment/${id}/toggle-active`).then(r => r.data)
+export const getMasterList = (key, includeInactive = false) =>
+  api.get(`/api/master/lists/${key}`, { params: { includeInactive } }).then(r => r.data)
+export const addMasterListItem = (key, value, frequencyYears = null) =>
+  api.post(`/api/master/lists/${key}`, { value, frequencyYears }).then(r => r.data)
+export const setListItemFrequency = (id, frequencyYears) =>
+  api.patch(`/api/master/lists/items/${id}/frequency`, { frequencyYears }).then(r => r.data)
+export const toggleMasterListItem = (id) =>
+  api.patch(`/api/master/lists/items/${id}/toggle-active`).then(r => r.data)
+
+// ---- QA-IT reminder notifications (corporate) ----
+export const getReminderSettings = () =>
+  api.get('/api/settings/qa-it-reminder').then(r => r.data)
+export const updateReminderSettings = (payload) =>
+  api.put('/api/settings/qa-it-reminder', payload).then(r => r.data)
+export const sendTestEmail = (to) =>
+  api.post('/api/settings/qa-it-reminder/test', { to }).then(r => r.data)
+export const runRemindersNow = () =>
+  api.post('/api/settings/qa-it-reminder/run-now').then(r => r.data)
+export const setUserEmail = (id, email) =>
+  api.patch(`/api/auth/users/${id}/email`, { email }).then(r => r.data)
