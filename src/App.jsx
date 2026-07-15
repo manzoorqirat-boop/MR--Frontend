@@ -7,6 +7,7 @@ import SitesAndPeriodsPage from './page/SitesAndPeriodsPage'
 import ScorecardEntryPage from './page/ScorecardEntryPage'
 import ScorecardAnalyticsPage from './page/ScorecardAnalyticsPage'
 import CorporateReviewPage from './page/CorporateReviewPage'
+import QaItCompliancePage from './page/QaItCompliancePage'
 import { Spinner } from './components/Feedback'
 
 /* ---------------- Icons (inline SVG, no dependencies) ---------------- */
@@ -30,7 +31,8 @@ const icons = {
   scorecard: <Icon><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18" /><path d="M9 9v11" /><path d="M15 9v11" /></Icon>,
   scAnalytics: <Icon><path d="M3 17l5-5 4 4 8-8" /><path d="M15 8h5v5" /></Icon>,
   review: <Icon><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 13l2 2 4-4" /></Icon>,
-  admin: <Icon><circle cx="9" cy="8" r="3.2" /><path d="M3.5 20c.6-3 2.8-5 5.5-5s4.9 2 5.5 5" /><circle cx="17.5" cy="7" r="2.2" /><path d="M15.5 12.6c2.6.3 4.4 2 5 4.9" /></Icon>
+  admin: <Icon><circle cx="9" cy="8" r="3.2" /><path d="M3.5 20c.6-3 2.8-5 5.5-5s4.9 2 5.5 5" /><circle cx="17.5" cy="7" r="2.2" /><path d="M15.5 12.6c2.6.3 4.4 2 5 4.9" /></Icon>,
+  qaIt: <Icon><path d="M12 3l8 3v6c0 4.5-3.2 7.6-8 9-4.8-1.4-8-4.5-8-9V6l8-3z" /><path d="M9 12l2 2 4-4" /></Icon>
 }
 
 /* ---------------- Navigation: Monthly Site Scorecard (MR) ---------------- */
@@ -42,6 +44,13 @@ const NAV_GROUPS = [
     links: [
       { to: '/scorecard', label: 'Scorecard', icon: 'scorecard' },
       { to: '/scorecard-analytics', label: 'Scorecard Analytics', icon: 'scAnalytics' }
+    ]
+  },
+  {
+    key: 'qait',
+    label: 'QA-IT Compliance',
+    links: [
+      { to: '/qa-it-compliance', label: 'Compliance Activities', icon: 'qaIt' }
     ]
   },
   {
@@ -149,6 +158,7 @@ function AuthenticatedApp() {
             <Route path="/" element={<Navigate to="/scorecard" replace />} />
             <Route path="/scorecard" element={<ScorecardEntryPage />} />
             <Route path="/scorecard-analytics" element={<ScorecardAnalyticsPage />} />
+            <Route path="/qa-it-compliance" element={<QaItCompliancePage />} />
             <Route
               path="/review"
               element={<CorporateRoute><CorporateReviewPage /></CorporateRoute>}
