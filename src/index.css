@@ -1239,3 +1239,128 @@ textarea {
 
 /* Uniform edit-table cards: denominator styling on single-row field counts */
 .sc-rows-of { font-size: 13px; font-weight: 600; color: #94a3b8; }
+
+/* ============================================================
+   QA-IT Compliance Activities — periodic review register
+   ============================================================ */
+.qa-page { display: flex; flex-direction: column; }
+.qa-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+}
+.qa-topbar-left, .qa-topbar-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.qa-inline { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #475569; }
+.qa-inline select, .qa-inline input { padding: 6px 8px; font-size: 13px; }
+
+.qa-stats {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: #475569;
+}
+.qa-stat strong { font-size: 15px; }
+.qa-stat-green strong { color: #16a34a; }
+.qa-stat-amber strong { color: #d97706; }
+.qa-stat-red strong { color: #dc2626; }
+
+.qa-table th {
+  white-space: normal;
+  vertical-align: bottom;
+  font-size: 12px;
+  min-width: 90px;
+}
+.qa-th-note { font-weight: 400; color: #94a3b8; font-size: 10.5px; }
+.qa-table input {
+  width: 100%;
+  min-width: 84px;
+  padding: 5px 7px;
+  font-size: 12.5px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+}
+.qa-done-cell { display: flex; gap: 4px; }
+.qa-done-cell input[type="text"] { min-width: 60px; max-width: 90px; }
+.qa-mon { display: block; font-size: 10.5px; color: #64748b; margin-top: 2px; }
+
+.qa-status {
+  display: inline-block;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  white-space: nowrap;
+}
+.qa-st-done      { background: #d1fae5; color: #065f46; }
+.qa-st-late      { background: #fde68a; color: #78350f; }
+.qa-st-due       { background: #fef3c7; color: #92400e; }
+.qa-st-overdue   { background: #fee2e2; color: #991b1b; }
+.qa-st-planned   { background: #e0e7ff; color: #3730a3; }
+.qa-st-unplanned { background: #f1f5f9; color: #64748b; }
+
+/* ---- Print: replicate the paper form ---- */
+.qa-print-head { display: none; }
+@media print {
+  .sidebar, .qa-topbar, .qa-stats, .qa-noprint, .success-banner, .error-banner { display: none !important; }
+  .app-content { padding: 0; max-width: none; }
+  .qa-register { box-shadow: none; border: none; padding: 0; }
+  .qa-print-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    margin-bottom: 10px;
+  }
+  .qa-table input { border: none; padding: 2px; font-size: 11px; }
+  .qa-table th, .qa-table td { border: 1px solid #000; font-size: 11px; }
+  .qa-mon { display: none; }
+}
+
+/* ---- Master data panel (Admin) ---- */
+.master-retired td { color: #94a3b8; text-decoration: line-through; }
+.master-retired td:last-child { text-decoration: none; }
+.master-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.master-chip-retired { opacity: 0.5; text-decoration: line-through; }
+.qa-eqname { font-size: 12.5px; font-weight: 600; color: #1e293b; }
+.qa-table select {
+  width: 100%;
+  min-width: 110px;
+  padding: 5px 6px;
+  font-size: 12.5px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+}
+
+/* ---- Frequency-based due date: auto/manual + justification ---- */
+.qa-due-cell { display: flex; align-items: center; gap: 4px; }
+.qa-chip-auto {
+  background: #d1fae5; color: #065f46;
+  border-radius: 999px; font-size: 10px; font-weight: 800; padding: 2px 7px;
+}
+.qa-chip-manual {
+  display: inline-block; margin-top: 3px;
+  background: #fef3c7; color: #92400e;
+  border-radius: 999px; font-size: 10px; font-weight: 700; padding: 2px 7px;
+  white-space: nowrap;
+}
+.qa-due-reset {
+  background: #eef2ff !important; color: #3730a3 !important;
+  border: 1px solid #c7d2fe !important; border-radius: 6px;
+  padding: 3px 7px; font-size: 12px; cursor: pointer;
+}
+.qa-justif {
+  display: block; width: 100%; margin-top: 4px;
+  border: 1px solid #d1d5db; border-radius: 6px;
+  padding: 4px 7px; font-size: 11.5px;
+}
+.qa-justif-missing { border-color: #f59e0b; background: #fffbeb; }
+.master-chip-wrap { display: inline-flex; align-items: center; gap: 2px; }
+.qa-freq-btn { padding: 4px 7px; font-size: 12px; }
+@media print { .qa-chip-auto, .qa-chip-manual, .qa-due-reset { display: none; } }
