@@ -8,6 +8,7 @@ import ScorecardEntryPage from './page/ScorecardEntryPage'
 import ScorecardAnalyticsPage from './page/ScorecardAnalyticsPage'
 import CorporateReviewPage from './page/CorporateReviewPage'
 import QaItCompliancePage from './page/QaItCompliancePage'
+import MasterDataPage from './page/MasterDataPage'
 import { Spinner } from './components/Feedback'
 
 /* ---------------- Icons (inline SVG, no dependencies) ---------------- */
@@ -32,7 +33,8 @@ const icons = {
   scAnalytics: <Icon><path d="M3 17l5-5 4 4 8-8" /><path d="M15 8h5v5" /></Icon>,
   review: <Icon><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 13l2 2 4-4" /></Icon>,
   admin: <Icon><circle cx="9" cy="8" r="3.2" /><path d="M3.5 20c.6-3 2.8-5 5.5-5s4.9 2 5.5 5" /><circle cx="17.5" cy="7" r="2.2" /><path d="M15.5 12.6c2.6.3 4.4 2 5 4.9" /></Icon>,
-  qaIt: <Icon><path d="M12 3l8 3v6c0 4.5-3.2 7.6-8 9-4.8-1.4-8-4.5-8-9V6l8-3z" /><path d="M9 12l2 2 4-4" /></Icon>
+  qaIt: <Icon><path d="M12 3l8 3v6c0 4.5-3.2 7.6-8 9-4.8-1.4-8-4.5-8-9V6l8-3z" /><path d="M9 12l2 2 4-4" /></Icon>,
+  masterData: <Icon><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8" /><path d="M4.5 5.5v6c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-6" /><path d="M4.5 11.5v6c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-6" /></Icon>
 }
 
 /* ---------------- Navigation: Monthly Site Scorecard (MR) ---------------- */
@@ -58,6 +60,7 @@ const NAV_GROUPS = [
     label: 'Workflow',
     links: [
       { to: '/review', label: 'Corporate Review', icon: 'review', corporateOnly: true },
+      { to: '/master-data', label: 'Master Data', icon: 'masterData', corporateOnly: true },
       { to: '/admin', label: 'Admin', icon: 'admin', corporateOnly: true }
     ]
   }
@@ -162,6 +165,10 @@ function AuthenticatedApp() {
             <Route
               path="/review"
               element={<CorporateRoute><CorporateReviewPage /></CorporateRoute>}
+            />
+            <Route
+              path="/master-data"
+              element={<CorporateRoute><MasterDataPage /></CorporateRoute>}
             />
             <Route
               path="/admin"
