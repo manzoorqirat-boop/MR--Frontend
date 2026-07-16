@@ -82,6 +82,7 @@ export default function QaItCompliancePage() {
   const [error, setError] = useState(null)
   const [notice, setNotice] = useState(null)
   const [snapshot, setSnapshot] = useState('')
+  const [openRows, setOpenRows] = useState([true])   // accordion: which cards are expanded
 
   const [equipment, setEquipment] = useState([])
   const [departments, setDepartments] = useState([])
@@ -119,6 +120,9 @@ export default function QaItCompliancePage() {
           }))
         : [blankRow()]
       setRows(loaded)
+      // Loaded systems start collapsed for a compact overview; a fresh blank
+      // register starts with its single empty card open for immediate entry.
+      setOpenRows(loaded.map(() => data.rows.length === 0))
       setVersion(data.version || '')
       setMeta(data.updatedAtUtc ? { updatedBy: data.updatedBy, updatedAtUtc: data.updatedAtUtc } : null)
       setSnapshot(JSON.stringify({ version: data.version || '', rows: loaded }))
@@ -162,9 +166,16 @@ export default function QaItCompliancePage() {
       ? { ...r, equipmentCode: eq?.code ?? '', equipmentName: eq?.name ?? '' }
       : r)))
   }
-  const addRow = () => setRows((rs) => [...rs, blankRow()])
-  const removeRow = (i) =>
+  const addRow = () => {
+    setRows((rs) => [...rs, blankRow()])
+    setOpenRows((os) => [...os, true])   // new system opens ready for entry
+  }
+  const removeRow = (i) => {
     setRows((rs) => (rs.length === 1 ? [blankRow()] : rs.filter((_, idx) => idx !== i)))
+    setOpenRows((os) => (rows.length === 1 ? [true] : os.filter((_, idx) => idx !== i)))
+  }
+  const toggleRow = (i) => setOpenRows((os) => os.map((o, idx) => (idx === i ? !o : o)))
+  const setAllOpen = (open) => setOpenRows(rows.map(() => open))
 
   async function handleSave() {
     // Frequency rule: a planned month differing from the computed one needs a
@@ -286,11 +297,144 @@ export default function QaItCompliancePage() {
         ) : !canQuery ? (
           <EmptyState>Pick a location and year above.</EmptyState>
         ) : (
-          <div className="scorecard-table-wrap">
-            <table className="qa-table">
+          <>
+            {/* ---------- Screen view: top-to-bottom collapsible cards ---------- */}
+            <div className="qa-acc qa-noprint">
+              <div className="qa-acc-toolbar">
+                <button type="button" className="qa-linkbtn" onClick={() => setAllOpen(true)}>Expand all</button>
+                <span className="qa-linksep">·</span>
+                <button type="button" className="qa-linkbtn" onClick={() => setAllOpen(false)}>Collapse all</button>
+              </div>
+
+              {rows.map((r, i) => {
+                const st = rowStatus(r)
+                const auto = computeAutoDue(r, categories)
+                const overridden = auto && r.nextPlannedDue && r.nextPlannedDue !== auto
+                const open = openRows[i] ?? false
+                return (
+                  <div key={i} className={`qa-acc-card qa-b-${st.key}${open ? ' open' : ''}`}>
+                    {/* ---- Collapsed header: the at-a-glance summary ---- */}
+                    <button type="button" className="qa-acc-head" onClick={() => toggleRow(i)}>
+                      <span className={`qa-acc-chev${open ? ' open' : ''}`}>▸</span>
+                      <span className="qa-acc-sr">{i + 1}</span>
+                      <span className="qa-acc-title">
+                        {r.equipmentName || <em className="muted">New system — pick equipment</em>}
+                        {r.equipmentCode && <span className="qa-acc-code">{r.equipmentCode}</span>}
+                      </span>
+                      <span className="qa-acc-meta">
+                        {[r.departmentArea, r.systemCategory].filter(Boolean).join(' · ') || '—'}
+                      </span>
+                      <span className="qa-acc-due">
+                        {r.nextPlannedDue ? <>Due {fmtMonth(r.nextPlannedDue)}</> : 'No plan'}
+                      </span>
+                      <span className={`qa-status ${st.cls}`}>{st.label}</span>
+                    </button>
+
+                    {/* ---- Expanded body: fields flow top-to-bottom, wrapping ---- */}
+                    {open && (
+                      <div className="qa-acc-body">
+                        <div className="qa-form-grid">
+                          <label className="qa-f">
+                            <span>Equipment/Instrument ID *</span>
+                            <select value={r.equipmentCode} onChange={(e) => pickEquipment(i, e.target.value)}>
+                              <option value="">— select —</option>
+                              {equipment.map((eq) => (
+                                <option key={eq.id} value={eq.code}>{eq.code} — {eq.name}</option>
+                              ))}
+                              {r.equipmentCode && !equipment.some((eq) => eq.code === r.equipmentCode) && (
+                                <option value={r.equipmentCode}>{r.equipmentCode} — {r.equipmentName} (retired)</option>
+                              )}
+                            </select>
+                          </label>
+                          <label className="qa-f">
+                            <span>Name of the Equipment/Instrument</span>
+                            <input value={r.equipmentName} readOnly placeholder="auto from ID" className="qa-ro" tabIndex={-1} />
+                          </label>
+                          <label className="qa-f">
+                            <span>Software Name &amp; Version</span>
+                            <input value={r.softwareNameVersion} onChange={(e) => setCell(i, 'softwareNameVersion', e.target.value)} placeholder="e.g. Empower 3 FR5" />
+                          </label>
+                          <label className="qa-f">
+                            <span>Department / Area</span>
+                            <select value={r.departmentArea} onChange={(e) => setCell(i, 'departmentArea', e.target.value)}>
+                              <option value="">— select —</option>
+                              {departments.map((d) => <option key={d.id} value={d.value}>{d.value}</option>)}
+                              {r.departmentArea && !departments.some((d) => d.value === r.departmentArea) && (
+                                <option value={r.departmentArea}>{r.departmentArea} (retired)</option>
+                              )}
+                            </select>
+                          </label>
+                          <label className="qa-f">
+                            <span>System Category</span>
+                            <select value={r.systemCategory} onChange={(e) => setCell(i, 'systemCategory', e.target.value)}>
+                              <option value="">— select —</option>
+                              {categories.map((c) => (
+                                <option key={c.id} value={c.value}>
+                                  {c.value}{c.frequencyYears ? ` (every ${c.frequencyYears} yr)` : ''}
+                                </option>
+                              ))}
+                              {r.systemCategory && !categories.some((c) => c.value === r.systemCategory) && (
+                                <option value={r.systemCategory}>{r.systemCategory} (retired)</option>
+                              )}
+                            </select>
+                          </label>
+                          <label className="qa-f">
+                            <span>Initial Qualification Date</span>
+                            <input type="date" value={r.initialQualificationDate} onChange={(e) => setCell(i, 'initialQualificationDate', e.target.value)} />
+                          </label>
+                          <label className="qa-f">
+                            <span>Last Periodic Review Date</span>
+                            <input type="date" value={r.lastPeriodicReviewDate} onChange={(e) => setCell(i, 'lastPeriodicReviewDate', e.target.value)} />
+                          </label>
+                          <label className="qa-f">
+                            <span>
+                              Next Planned Review Due
+                              {auto && !overridden && r.nextPlannedDue && <span className="qa-chip-auto">auto</span>}
+                            </span>
+                            <span className="qa-due-cell">
+                              <input type="month" value={r.nextPlannedDue} onChange={(e) => setCell(i, 'nextPlannedDue', e.target.value)} />
+                              {overridden && (
+                                <button type="button" className="qa-due-reset" title={`Reset to frequency-based ${fmtMonth(auto)}`}
+                                  onClick={() => setCell(i, 'nextPlannedDue', auto)}>↺</button>
+                              )}
+                            </span>
+                            {overridden && (
+                              <>
+                                <span className="qa-chip-manual">manual (auto: {fmtMonth(auto)})</span>
+                                <input
+                                  type="text"
+                                  className={`qa-justif${(r.dueJustification || '').trim() ? '' : ' qa-justif-missing'}`}
+                                  value={r.dueJustification}
+                                  placeholder="Justification (mandatory)"
+                                  onChange={(e) => setCell(i, 'dueJustification', e.target.value)}
+                                />
+                              </>
+                            )}
+                          </label>
+                          <label className="qa-f">
+                            <span>Actual Review Done On <small className="muted">(window: planned +2 months)</small></span>
+                            <input type="month" value={r.actualDoneOn} onChange={(e) => setCell(i, 'actualDoneOn', e.target.value)} />
+                          </label>
+                          <label className="qa-f">
+                            <span>Done By</span>
+                            <input value={r.actualDoneBy} onChange={(e) => setCell(i, 'actualDoneBy', e.target.value)} placeholder="Name / initials" />
+                          </label>
+                        </div>
+                        <div className="qa-acc-actions">
+                          <button type="button" className="secondary" onClick={() => removeRow(i)}>✕ Remove system</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* ---------- Print view: the classic paper-form table ---------- */}
+            <table className="qa-table qa-print-table">
               <thead>
                 <tr>
-                  <th style={{ width: 36 }}>Sr. No.</th>
+                  <th>Sr. No.</th>
                   <th>Name of the Equipment/Instrument</th>
                   <th>Equipment/Instrument ID</th>
                   <th>Software Name &amp; Version</th>
@@ -299,109 +443,27 @@ export default function QaItCompliancePage() {
                   <th>Initial Qualification Date</th>
                   <th>Last Periodic Review Date</th>
                   <th>Next Planned Periodic Review Due On</th>
-                  <th>Actual Periodic Review Done On / By<br /><span className="qa-th-note">(scheduled month +2 months)</span></th>
-                  <th className="qa-noprint" style={{ width: 104 }}>Status</th>
-                  <th className="qa-noprint" style={{ width: 40 }} />
+                  <th>Actual Periodic Review Done On / By</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r, i) => {
-                  const st = rowStatus(r)
-                  return (
-                    <tr key={i}>
-                      <td className="muted">{i + 1}</td>
-                      <td>
-                        <span className="qa-eqname">{r.equipmentName || <span className="muted">— pick ID —</span>}</span>
-                      </td>
-                      <td>
-                        <select value={r.equipmentCode} onChange={(e) => pickEquipment(i, e.target.value)}>
-                          <option value="">— select —</option>
-                          {equipment.map((eq) => (
-                            <option key={eq.id} value={eq.code}>{eq.code} — {eq.name}</option>
-                          ))}
-                          {r.equipmentCode && !equipment.some((eq) => eq.code === r.equipmentCode) && (
-                            <option value={r.equipmentCode}>{r.equipmentCode} — {r.equipmentName} (retired)</option>
-                          )}
-                        </select>
-                      </td>
-                      <td><input value={r.softwareNameVersion} onChange={(e) => setCell(i, 'softwareNameVersion', e.target.value)} placeholder="e.g. Empower 3 FR5" /></td>
-                      <td>
-                        <select value={r.departmentArea} onChange={(e) => setCell(i, 'departmentArea', e.target.value)}>
-                          <option value="">— select —</option>
-                          {departments.map((d) => <option key={d.id} value={d.value}>{d.value}</option>)}
-                          {r.departmentArea && !departments.some((d) => d.value === r.departmentArea) && (
-                            <option value={r.departmentArea}>{r.departmentArea} (retired)</option>
-                          )}
-                        </select>
-                      </td>
-                      <td>
-                        <select value={r.systemCategory} onChange={(e) => setCell(i, 'systemCategory', e.target.value)}>
-                          <option value="">— select —</option>
-                          {categories.map((c) => <option key={c.id} value={c.value}>{c.value}</option>)}
-                          {r.systemCategory && !categories.some((c) => c.value === r.systemCategory) && (
-                            <option value={r.systemCategory}>{r.systemCategory} (retired)</option>
-                          )}
-                        </select>
-                      </td>
-                      <td><input type="date" value={r.initialQualificationDate} onChange={(e) => setCell(i, 'initialQualificationDate', e.target.value)} /></td>
-                      <td><input type="date" value={r.lastPeriodicReviewDate} onChange={(e) => setCell(i, 'lastPeriodicReviewDate', e.target.value)} /></td>
-                      <td>
-                        {(() => {
-                          const auto = computeAutoDue(r, categories)
-                          const overridden = auto && r.nextPlannedDue && r.nextPlannedDue !== auto
-                          return (
-                            <>
-                              <div className="qa-due-cell">
-                                <input type="month" value={r.nextPlannedDue} onChange={(e) => setCell(i, 'nextPlannedDue', e.target.value)} />
-                                {auto && (
-                                  overridden ? (
-                                    <button
-                                      type="button"
-                                      className="qa-due-reset"
-                                      title={`Reset to frequency-based ${fmtMonth(auto)}`}
-                                      onClick={() => { setCell(i, 'nextPlannedDue', auto) }}
-                                    >↺</button>
-                                  ) : r.nextPlannedDue ? (
-                                    <span className="qa-chip-auto" title="Matches the category frequency rule">auto</span>
-                                  ) : null
-                                )}
-                              </div>
-                              {r.nextPlannedDue && <span className="qa-mon">{fmtMonth(r.nextPlannedDue)}</span>}
-                              {overridden && (
-                                <>
-                                  <span className="qa-chip-manual" title={`Frequency-based date is ${fmtMonth(auto)}`}>
-                                    manual (auto: {fmtMonth(auto)})
-                                  </span>
-                                  <input
-                                    type="text"
-                                    className={`qa-justif${(r.dueJustification || '').trim() ? '' : ' qa-justif-missing'}`}
-                                    value={r.dueJustification}
-                                    placeholder="Justification (mandatory)"
-                                    onChange={(e) => setCell(i, 'dueJustification', e.target.value)}
-                                  />
-                                </>
-                              )}
-                            </>
-                          )
-                        })()}
-                      </td>
-                      <td>
-                        <div className="qa-done-cell">
-                          <input type="month" value={r.actualDoneOn} onChange={(e) => setCell(i, 'actualDoneOn', e.target.value)} />
-                          <input type="text" value={r.actualDoneBy} placeholder="By" onChange={(e) => setCell(i, 'actualDoneBy', e.target.value)} />
-                        </div>
-                        {r.actualDoneOn && <span className="qa-mon">{fmtMonth(r.actualDoneOn)}{r.actualDoneBy ? ` / ${r.actualDoneBy}` : ''}</span>}
-                      </td>
-                      <td className="qa-noprint"><span className={`qa-status ${st.cls}`}>{st.label}</span></td>
-                      <td className="qa-noprint">
-                        <button type="button" className="secondary" onClick={() => removeRow(i)} title="Remove row">✕</button>
-                      </td>
-                    </tr>
-                  )
-                })}
+                {rows.filter((r) => (r.equipmentName || '').trim()).map((r, i) => (
+                  <tr key={i}>
+                    <td>{i + 1}</td>
+                    <td>{r.equipmentName}</td>
+                    <td>{r.equipmentCode}</td>
+                    <td>{r.softwareNameVersion}</td>
+                    <td>{r.departmentArea}</td>
+                    <td>{r.systemCategory}</td>
+                    <td>{r.initialQualificationDate}</td>
+                    <td>{r.lastPeriodicReviewDate}</td>
+                    <td>{fmtMonth(r.nextPlannedDue)}</td>
+                    <td>{fmtMonth(r.actualDoneOn)}{r.actualDoneBy ? ` / ${r.actualDoneBy}` : ''}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
-          </div>
+          </>
         )}
 
         <div className="row qa-noprint" style={{ marginTop: 10, marginBottom: 0 }}>
