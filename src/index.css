@@ -1307,6 +1307,7 @@ textarea {
 
 /* ---- Print: replicate the paper form ---- */
 .qa-print-head { display: none; }
+.qa-print-table { display: none; }
 @media print {
   .sidebar, .qa-topbar, .qa-stats, .qa-noprint, .success-banner, .error-banner { display: none !important; }
   .app-content { padding: 0; max-width: none; }
@@ -1317,8 +1318,8 @@ textarea {
     font-size: 13px;
     margin-bottom: 10px;
   }
-  .qa-table input { border: none; padding: 2px; font-size: 11px; }
-  .qa-table th, .qa-table td { border: 1px solid #000; font-size: 11px; }
+  .qa-print-table { display: table; width: 100%; border-collapse: collapse; }
+  .qa-print-table th, .qa-print-table td { border: 1px solid #000; font-size: 11px; padding: 4px 6px; }
   .qa-mon { display: none; }
 }
 
@@ -1364,3 +1365,94 @@ textarea {
 .master-chip-wrap { display: inline-flex; align-items: center; gap: 2px; }
 .qa-freq-btn { padding: 4px 7px; font-size: 12px; }
 @media print { .qa-chip-auto, .qa-chip-manual, .qa-due-reset { display: none; } }
+
+
+/* ============================================================
+   QA-IT register: top-to-bottom collapsible cards (no H-scroll)
+   ============================================================ */
+.qa-acc { display: flex; flex-direction: column; gap: 8px; }
+.qa-acc-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.qa-linkbtn {
+  background: transparent !important;
+  border: none !important;
+  color: #1d4ed8 !important;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+}
+.qa-linkbtn:hover { text-decoration: underline; }
+.qa-linksep { color: #cbd5e1; }
+
+.qa-acc-card {
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid #94a3b8;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+/* status-coloured left border on each card */
+.qa-b-done      { border-left-color: #16a34a; }
+.qa-b-late      { border-left-color: #d97706; }
+.qa-b-due       { border-left-color: #f59e0b; }
+.qa-b-overdue   { border-left-color: #dc2626; }
+.qa-b-planned   { border-left-color: #6366f1; }
+.qa-b-unplanned { border-left-color: #94a3b8; }
+
+.qa-acc-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: #fff !important;
+  border: none !important;
+  color: inherit !important;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13.5px;
+}
+.qa-acc-card.open .qa-acc-head { border-bottom: 1px solid #f1f5f9 !important; }
+.qa-acc-head:hover { background: #f8fafc !important; }
+.qa-acc-chev { font-size: 12px; color: #64748b; transition: transform .15s ease; }
+.qa-acc-chev.open { transform: rotate(90deg); }
+.qa-acc-sr {
+  background: #f1f5f9; color: #475569;
+  border-radius: 6px; font-size: 11.5px; font-weight: 700;
+  min-width: 22px; text-align: center; padding: 2px 4px;
+}
+.qa-acc-title { font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.qa-acc-title em { font-weight: 500; }
+.qa-acc-code {
+  background: #eef2ff; color: #3730a3;
+  border-radius: 999px; font-size: 11px; font-weight: 700; padding: 2px 8px;
+  white-space: nowrap;
+}
+.qa-acc-meta { color: #64748b; font-size: 12.5px; margin-left: auto; white-space: nowrap; }
+.qa-acc-due { color: #334155; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+
+.qa-acc-body { padding: 12px 14px 14px; }
+.qa-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px 14px;
+}
+.qa-f { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #475569; min-width: 0; }
+.qa-f input, .qa-f select {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 13px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  font-weight: 400;
+  color: #0f172a;
+}
+.qa-f .qa-ro { background: #f8fafc; color: #334155; }
+.qa-f .qa-chip-auto { margin-left: 6px; }
+.qa-acc-actions { display: flex; justify-content: flex-end; margin-top: 10px; }
+.qa-acc-actions button { font-size: 12.5px; padding: 5px 10px; }
+
+@media (max-width: 720px) {
+  .qa-acc-meta { display: none; }
+}
