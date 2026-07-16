@@ -143,3 +143,14 @@ export const runRemindersNow = () =>
   api.post('/api/settings/qa-it-reminder/run-now').then(r => r.data)
 export const setUserEmail = (id, email) =>
   api.patch(`/api/auth/users/${id}/email`, { email }).then(r => r.data)
+
+// ---- Master data: Excel template + bulk import ----
+export const downloadMasterTemplate = () =>
+  api.get('/api/master/template', { responseType: 'blob' }).then(r => r.data)
+export const importMasterData = (file) => {
+  const form = new FormData()
+  form.append('file', file)
+  return api.post('/api/master/import', form, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }).then(r => r.data)
+}
