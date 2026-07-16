@@ -1,7 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppContext } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
-import { getQaItRegister, saveQaItRegister, getEquipmentMaster, getMasterList } from '../client'
+import {
+  getQaItRegister, saveQaItRegister, getEquipmentMaster, getMasterList,
+  downloadQaItTemplate, importQaItRegister
+} from '../client'
 import { Spinner, ErrorBanner, EmptyState } from '../components/Feedback'
 
 // ============================================================================
@@ -92,14 +95,13 @@ export default function QaItCompliancePage() {
   const dirty = JSON.stringify({ version, rows }) !== snapshot
 
   // Master data: equipment is per site; the two lists are global.
-  useEffect(() => {
-    if (!selectedSiteId) return
-    getEquipmentMaster(selectedSiteId).then(setEquipment).catch(() => setEquipment([]))
-  }, [selectedSiteId])
-  useEffect(() => {
+  const loadMasters = useCallback(() => {
+    if (selectedSiteId)
+      getEquipmentMaster(selectedSiteId).then(setEquipment).catch(() => setEquipment([]))
     getMasterList('department').then(setDepartments).catch(() => setDepartments([]))
     getMasterList('systemCategory').then(setCategories).catch(() => setCategories([]))
-  }, [])
+  }, [selectedSiteId])
+  useEffect(() => { loadMasters() }, [loadMasters])
 
   const load = useCallback(async () => {
     if (!canQuery) return
@@ -206,6 +208,73 @@ export default function QaItCompliancePage() {
     }
   }
 
+  // ---- Excel template + import ----
+  const fileRef = useRef(null)
+  const [importing, setImporting] = useState(false)
+  const [importSummary, setImportSummary] = useState(null)
+
+  async function handleDownloadTemplate() {
+    setError(null)
+    try {
+      const blob = await downloadQaItTemplate(selectedSiteId)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'QaIt_PeriodicReview_Template.xlsx'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message)
+    }
+  }
+
+  async function handleImport(ev) {
+    const file = ev.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    setImportSummary(null)
+    setError(null)
+    setNotice(null)
+    try {
+      const res = await importQaItRegister(selectedSiteId, file)
+
+      // Merge into the grid: rows whose Equipment ID is already present are
+      // skipped (no repeats in the register either); new ones are appended.
+      const existingCodes = new Set(
+        rows.map((r) => (r.equipmentCode || '').toLowerCase()).filter(Boolean)
+      )
+      const fresh = res.rows.filter((r) => !existingCodes.has(r.equipmentCode.toLowerCase()))
+      const skippedInGrid = res.rows.length - fresh.length
+      if (fresh.length) {
+        setRows((rs) => {
+          const base = rs.length === 1 && !(rs[0].equipmentName || '').trim() ? [] : rs
+          return [...base, ...fresh.map((r) => ({ ...r }))]
+        })
+        setOpenRows((os) => {
+          const base = rows.length === 1 && !(rows[0].equipmentName || '').trim() ? [] : os
+          return [...base, ...fresh.map(() => false)]
+        })
+      }
+      await loadMasters()   // dropdowns must know the newly added master values
+
+      setImportSummary({
+        rows: fresh.length,
+        skippedInGrid,
+        eq: res.equipmentAddedToMaster,
+        dept: res.departmentsAddedToMaster,
+        cat: res.categoriesAddedToMaster,
+        errors: res.errors || []
+      })
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message)
+    } finally {
+      setImporting(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
   const stats = useMemo(() => {
     const withName = rows.filter((r) => (r.equipmentName || '').trim())
     const st = withName.map(rowStatus)
@@ -258,6 +327,11 @@ export default function QaItCompliancePage() {
           </label>
         </div>
         <div className="qa-topbar-right">
+          <button type="button" className="secondary" onClick={handleDownloadTemplate}>⬇ Template</button>
+          <button type="button" className="secondary" disabled={importing} onClick={() => fileRef.current?.click()}>
+            {importing ? 'Importing…' : '⬆ Import Excel'}
+          </button>
+          <input ref={fileRef} type="file" accept=".xlsx" style={{ display: 'none' }} onChange={handleImport} />
           <button type="button" className="secondary" onClick={() => window.print()}>🖨 Print</button>
           <button type="button" disabled={saving || !dirty} onClick={handleSave}>
             {saving ? 'Saving…' : dirty ? 'Save register' : 'Saved ✓'}
@@ -267,6 +341,22 @@ export default function QaItCompliancePage() {
 
       <ErrorBanner message={error} />
       {notice && <div className="success-banner">{notice}</div>}
+      {importSummary && (
+        <div className={`card md-import-result qa-noprint${importSummary.errors.length ? ' has-errors' : ''}`}>
+          <strong>Import complete.</strong>{' '}
+          {importSummary.rows} system(s) added to the register below
+          {importSummary.skippedInGrid > 0 && <> · {importSummary.skippedInGrid} skipped (Equipment ID already in the register)</>}
+          {' '}· Master data updated: {importSummary.eq} equipment, {importSummary.dept} department(s), {importSummary.cat} categor{importSummary.cat === 1 ? 'y' : 'ies'} added (existing ones matched, never repeated).
+          {importSummary.cat > 0 && <> New categories have no review frequency yet — set it on the Master Data page to enable auto-fill.</>}
+          {' '}<strong>Review the rows and click Save register.</strong>
+          {importSummary.errors.length > 0 && (
+            <ul className="md-import-errors">
+              {importSummary.errors.map((e, i) => <li key={i}>{e}</li>)}
+            </ul>
+          )}
+          <button type="button" className="qa-linkbtn" onClick={() => setImportSummary(null)}>Dismiss</button>
+        </div>
+      )}
 
       {/* ============ Compliance summary ============ */}
       {stats.total > 0 && (
