@@ -154,3 +154,16 @@ export const importMasterData = (file) => {
     headers: { 'Content-Type': 'multipart/form-data' }
   }).then(r => r.data)
 }
+
+// ---- QA-IT register: Excel template + import (import also feeds master data) ----
+export const downloadQaItTemplate = (siteId) =>
+  api.get('/api/qa-it/periodic-reviews/template', { params: { siteId }, responseType: 'blob' })
+    .then(r => r.data)
+export const importQaItRegister = (siteId, file) => {
+  const form = new FormData()
+  form.append('file', file)
+  return api.post('/api/qa-it/periodic-reviews/import', form, {
+    params: { siteId },
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }).then(r => r.data)
+}
