@@ -1,6 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppContext } from '../context/AppContext'
 import {
+  downloadMasterTemplate,
+  importMasterData,
   getEquipmentMaster,
   createEquipment,
   toggleEquipment,
@@ -70,6 +72,46 @@ export default function MasterDataPage() {
   useEffect(() => { loadEquipment() }, [loadEquipment])
   useEffect(() => { loadDepartments(); loadCategories() }, [loadDepartments, loadCategories])
 
+  // ---- Excel template + bulk import ----
+  const fileRef = useRef(null)
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState(null)
+
+  async function handleDownloadTemplate() {
+    setError(null)
+    try {
+      const blob = await downloadMasterTemplate()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'MasterData_Template.xlsx'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message)
+    }
+  }
+
+  async function handleImport(ev) {
+    const file = ev.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    setImportResult(null)
+    setError(null)
+    try {
+      const res = await importMasterData(file)
+      setImportResult(res)
+      await Promise.all([loadEquipment(), loadDepartments(), loadCategories()])
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message)
+    } finally {
+      setImporting(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
   const counts = {
     equipment: equipment?.filter((i) => i.isActive).length,
     department: departments?.filter((i) => i.isActive).length,
@@ -79,13 +121,39 @@ export default function MasterDataPage() {
 
   return (
     <>
-      <div className="card">
-        <h1 style={{ margin: 0 }}>Master Data</h1>
-        <p className="muted" style={{ marginBottom: 0 }}>
-          Controlled lists used across the portal. Sites pick from these; only corporate edits them.
-          Retiring an item hides it from new entries without touching historical records.
-        </p>
+      <div className="card md-pagehead">
+        <div>
+          <h1 style={{ margin: 0 }}>Master Data</h1>
+          <p className="muted" style={{ marginBottom: 0 }}>
+            Controlled lists used across the portal. Sites pick from these; only corporate edits them.
+            Retiring an item hides it from new entries without touching historical records.
+          </p>
+        </div>
+        <div className="md-pagehead-actions">
+          <button type="button" className="secondary" onClick={handleDownloadTemplate}>
+            ⬇ Download template
+          </button>
+          <button type="button" disabled={importing} onClick={() => fileRef.current?.click()}>
+            {importing ? 'Importing…' : '⬆ Import Excel'}
+          </button>
+          <input ref={fileRef} type="file" accept=".xlsx" style={{ display: 'none' }} onChange={handleImport} />
+        </div>
       </div>
+
+      {importResult && (
+        <div className={`card md-import-result${importResult.errors?.length ? ' has-errors' : ''}`}>
+          <strong>Import complete.</strong>{' '}
+          Equipment: {importResult.equipmentAdded} added, {importResult.equipmentSkipped} already existed ·
+          Departments: {importResult.departmentsAdded} added, {importResult.departmentsSkipped} existed ·
+          Categories: {importResult.categoriesAdded} added, {importResult.categoriesUpdated} frequency updated, {importResult.categoriesSkipped} existed
+          {importResult.errors?.length > 0 && (
+            <ul className="md-import-errors">
+              {importResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+            </ul>
+          )}
+          <button type="button" className="qa-linkbtn" onClick={() => setImportResult(null)}>Dismiss</button>
+        </div>
+      )}
 
       <ErrorBanner message={error} />
 
