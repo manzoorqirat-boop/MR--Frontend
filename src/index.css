@@ -1566,3 +1566,11 @@ textarea {
   .md-menu { flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
   .md-menu-item { min-width: 190px; }
 }
+
+/* ---- Master data: template + import ---- */
+.md-pagehead { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.md-pagehead-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.md-import-result { border-left: 4px solid #16a34a; font-size: 13px; }
+.md-import-result.has-errors { border-left-color: #f59e0b; }
+.md-import-errors { margin: 8px 0 4px; padding-left: 18px; color: #b45309; font-size: 12.5px; }
+.md-import-errors li { margin-bottom: 3px; }
