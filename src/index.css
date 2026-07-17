@@ -1574,3 +1574,6 @@ textarea {
 .md-import-result.has-errors { border-left-color: #f59e0b; }
 .md-import-errors { margin: 8px 0 4px; padding-left: 18px; color: #b45309; font-size: 12.5px; }
 .md-import-errors li { margin-bottom: 3px; }
+
+/* Long sidebar link labels (e.g. Periodic Review of Computerized Systems) wrap cleanly */
+.sidebar-link-label { white-space: normal; line-height: 1.25; }
