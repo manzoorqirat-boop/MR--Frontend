@@ -298,7 +298,7 @@ export default function QaItCompliancePage() {
       {/* ============ Header: LOCATION / VERSION / YEAR (like the form) ============ */}
       <div className="card qa-topbar">
         <div className="qa-topbar-left">
-          <span className="sc-topbar-title">QA-IT Compliance — Periodic Review of Computerized Systems</span>
+          <span className="sc-topbar-title">Periodic Review of Computerized Systems</span>
           <label className="qa-inline">
             <span>Location</span>
             {isCorporate ? (
