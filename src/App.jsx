@@ -49,10 +49,10 @@ const NAV_GROUPS = [
     ]
   },
   {
-    key: 'qait',
-    label: 'QA-IT Compliance',
+    key: 'compliance',
+    label: 'Compliance Activities',
     links: [
-      { to: '/qa-it-compliance', label: 'Compliance Activities', icon: 'qaIt' }
+      { to: '/qa-it-compliance', label: 'Periodic Review of Computerized Systems', icon: 'qaIt' }
     ]
   },
   {
